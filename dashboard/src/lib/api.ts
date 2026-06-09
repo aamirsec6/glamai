@@ -272,3 +272,11 @@ export function useGbpPosts(orgId: string) {
 export function useGbpRankings(orgId: string) {
   return useSWR(orgId ? `/api/v1/gbp/rankings?org_id=${orgId}` : null, fetcher, swrConfig);
 }
+
+export function useReports(orgId: string) {
+  return useSWR(orgId ? `/api/v1/reports?org_id=${orgId}` : null, fetcher, swrConfig);
+}
+
+export function useUserJourney(orgId: string) {
+  return useSWR(orgId ? `/api/v1/admin/orgs/${orgId}/journey` : null, fetcher, swrConfig);
+}
