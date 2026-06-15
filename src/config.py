@@ -87,9 +87,9 @@ class Settings(BaseSettings):
     territory_gym_radius_km: float = 5.0
 
     # ── Feature Flags ────────────────────────────────────────
-    feature_review_engine: bool = True
-    feature_reengagement: bool = True
-    feature_content_generator: bool = True
+    feature_review_engine: bool = False
+    feature_reengagement: bool = False
+    feature_content_generator: bool = False
     feature_multi_city: bool = False
     feature_multi_vertical: bool = False
 

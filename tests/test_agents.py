@@ -51,10 +51,10 @@ def test_campaign_type_values():
     assert CampaignType.STALE_LEAD.value == "stale_lead"
 
 
-def test_feature_flags_enabled_by_default():
+def test_feature_flags_disabled_by_default():
     from src.config import get_settings
 
     s = get_settings()
-    assert s.feature_review_engine is True
-    assert s.feature_reengagement is True
-    assert s.feature_content_generator is True
+    assert s.feature_review_engine is False
+    assert s.feature_reengagement is False
+    assert s.feature_content_generator is False

@@ -1,4 +1,4 @@
-"""Pre-approved WhatsApp message templates."""
+"""Pre-approved WhatsApp message templates for dental clinics."""
 
 from __future__ import annotations
 
@@ -23,20 +23,20 @@ def get_lead_notification_message(
 
 def get_lead_welcome_message(business_name: str) -> str:
     return (
-        f"Hi! Thanks for contacting *{business_name}*! 🏠\n\n"
-        f"We're excited to help you with your project.\n\n"
+        f"Hi! Thanks for contacting *{business_name}*! 🦷\n\n"
+        f"We're here to help with your dental needs.\n\n"
         f"A few quick questions:\n"
-        f"1. What type of space is this for?\n"
-        f"2. Approximate size?\n"
-        f"3. Budget range?\n"
-        f"4. When would you like to start?"
+        f"1. What dental service are you looking for?\n"
+        f"2. Any specific concern or pain?\n"
+        f"3. Preferred area?\n"
+        f"4. When would you like to visit?"
     )
 
 
 def get_lead_followup_message(business_name: str) -> str:
     return (
         f"Hi! Just checking in from *{business_name}* 👋\n\n"
-        f"We'd love to help with your project. "
+        f"We'd love to help with your dental needs. "
         f"When would be a good time for a quick call?"
     )
 
@@ -62,9 +62,9 @@ def get_onboarding_welcome_message(business_name: str) -> str:
 def get_repeat_sale_message(business_name: str, customer_name: str) -> str:
     return (
         f"Hi {customer_name}! 👋\n\n"
-        f"It's been a while since we worked together at *{business_name}*.\n\n"
-        f"We have new design packages and seasonal offers — "
-        f"would you like a free consultation for your next project?\n\n"
+        f"It's been a while since your last visit to *{business_name}*.\n\n"
+        f"We have new dental packages and seasonal offers — "
+        f"would you like a free consultation?\n\n"
         f"Reply YES and we'll call you back."
     )
 
@@ -81,7 +81,7 @@ def get_stale_lead_reminder_message(business_name: str, customer_name: str) -> s
     return (
         f"Hi {customer_name}! 👋\n\n"
         f"You reached out to *{business_name}* recently. "
-        f"We're still here to help with your project.\n\n"
+        f"We're still here to help with your dental needs.\n\n"
         f"Reply with a good time to call, or share any updates."
     )
 
@@ -95,8 +95,8 @@ def get_review_request_message(
     return (
         f"Hi {customer_name}! ⭐\n\n"
         f"Thank you for choosing *{business_name}*! "
-        f"We hope you loved the experience.\n\n"
-        f"A quick Google review helps other customers find us."
+        f"We hope you had a great experience.\n\n"
+        f"A quick Google review helps other patients find us."
         f"{link_line}\n\n"
         f"It only takes 30 seconds — we really appreciate it!"
     )
@@ -132,7 +132,7 @@ TEMPLATE_DEFINITIONS = [
         "components": [
             {
                 "type": "BODY",
-                "text": "Hi {{1}}! {{2}} has a special offer for returning customers. Reply YES to learn more.",
+                "text": "Hi {{1}}! {{2}} has a special offer for returning patients. Reply YES to learn more.",
             },
         ],
     },

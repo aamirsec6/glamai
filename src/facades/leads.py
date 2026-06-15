@@ -89,8 +89,8 @@ class LeadFacade:
 
         lead = Lead(
             org_id=org_id,
-            phone=phone,
-            name=name,
+            contact_phone=phone,
+            contact_name=name or "Unknown",
             source=lead_source,
             status=LeadStatus.NEW,
         )
