@@ -7,8 +7,8 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
-from sqlalchemy import Column, Enum as SAEnum, Index
-from sqlmodel import Field, Relationship, SQLModel
+from sqlalchemy import Column, Enum as SAEnum, Index, Text
+from sqlmodel import Field, SQLModel
 
 if TYPE_CHECKING:
     from src.models.org import Org
@@ -121,9 +121,6 @@ class MonthlyReport(SQLModel, table=True):
     generated_at: datetime | None = Field(default=None)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
-
-    # ── Relationships ────────────────────────────────────────
-    org: Org = Relationship(back_populates="monthly_reports")
 
     # ── Indexes ──────────────────────────────────────────────
     __table_args__ = (

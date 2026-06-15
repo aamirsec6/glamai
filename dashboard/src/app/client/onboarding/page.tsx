@@ -4,6 +4,10 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { useUser } from "@clerk/nextjs";
+import ApiClient from "@/lib/api";
+import { useOrgId } from "@/lib/org-context";
+import { isClerkEnabled } from "@/lib/auth-config";
 import {
   Card,
   CardContent,
@@ -59,29 +63,230 @@ const CATEGORIES = [
   { value: "other", label: "Other" },
 ];
 
+// ── Business signup (required before GBP OAuth) ──
+
+function BusinessSignupForm({
+  onCreated,
+  clerkUser,
+}: {
+  onCreated: (orgId: string) => void;
+  clerkUser: { id: string; primaryEmailAddress?: { emailAddress?: string | null } | null } | null;
+}) {
+  const { setOrgId } = useOrgId();
+  const [name, setName] = React.useState("");
+  const [email, setEmail] = React.useState("");
+  const [phone, setPhone] = React.useState("");
+  const [address, setAddress] = React.useState("");
+  const [city, setCity] = React.useState("Bangalore");
+  const [category, setCategory] = React.useState("interior_design");
+  const [submitting, setSubmitting] = React.useState(false);
+  const [error, setError] = React.useState("");
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim() || !email.trim() || !phone.trim()) {
+      setError("Business name, email, and phone are required");
+      return;
+    }
+    setSubmitting(true);
+    setError("");
+    try {
+      const res = await ApiClient.createOrg({
+        name: name.trim(),
+        email: email.trim(),
+        phone: phone.replace(/\D/g, ""),
+        address: address.trim() || `${city}, India`,
+        city,
+        category,
+      } as never);
+      if (!res?.data?.id) {
+        throw new Error("Failed to create organization");
+      }
+      if (clerkUser) {
+        try {
+          await ApiClient.createMember({
+            clerk_user_id: clerkUser.id,
+            org_id: res.data.id,
+            role: "owner",
+            email: clerkUser.primaryEmailAddress?.emailAddress ?? undefined,
+          });
+        } catch {
+          // Org created; member link can be retried later
+        }
+      }
+      setOrgId(res.data.id);
+      onCreated(res.data.id);
+    } catch {
+      setError("Could not create your business account. Check the API is running.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Building2 className="h-5 w-5 text-primary" />
+          Create Your Business Account
+        </CardTitle>
+        <CardDescription>
+          Tell us about your business first, then connect Google Business Profile.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-foreground">
+              Business Name
+            </label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Studio Interiors"
+              className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+              required
+            />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-foreground">
+                Email
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@business.com"
+                className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                required
+              />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-foreground">
+                Phone
+              </label>
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+91 98765 43210"
+                className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                required
+              />
+            </div>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-foreground">
+              Business Address
+            </label>
+            <input
+              type="text"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder="123 MG Road, Bangalore"
+              className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-foreground">
+                City
+              </label>
+              <input
+                type="text"
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-foreground">
+                Category
+              </label>
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                {CATEGORIES.map((cat) => (
+                  <option key={cat.value} value={cat.value}>
+                    {cat.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          {error && (
+            <div className="flex items-center gap-2 text-sm text-danger">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              {error}
+            </div>
+          )}
+          <Button type="submit" className="w-full" disabled={submitting}>
+            {submitting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Creating account...
+              </>
+            ) : (
+              <>
+                Continue to GBP Setup
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </>
+            )}
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
+  );
+}
+
+function BusinessSignupWithClerk({
+  onCreated,
+}: {
+  onCreated: (orgId: string) => void;
+}) {
+  const { user } = useUser();
+  return <BusinessSignupForm onCreated={onCreated} clerkUser={user ?? null} />;
+}
+
+function BusinessSignup({
+  onCreated,
+}: {
+  onCreated: (orgId: string) => void;
+}) {
+  if (isClerkEnabled) {
+    return <BusinessSignupWithClerk onCreated={onCreated} />;
+  }
+  return <BusinessSignupForm onCreated={onCreated} clerkUser={null} />;
+}
+
 // ── Step 1: Connect Google Business Profile ──
 
 function Step1Gbp({
   formData,
   setFormData,
   onNext,
+  orgId,
 }: {
   formData: FormData;
   setFormData: React.Dispatch<React.SetStateAction<FormData>>;
   onNext: () => void;
+  orgId: string;
 }) {
   const [connecting, setConnecting] = React.useState(false);
+  const [error, setError] = React.useState("");
 
   const handleConnect = () => {
+    if (!orgId) {
+      setError("Create your business account first (above), then connect GBP.");
+      return;
+    }
+    setError("");
     setConnecting(true);
-    setTimeout(() => {
-      setFormData((prev) => ({
-        ...prev,
-        gbpConnected: true,
-        gbpPlaceId: "ChIJ_example123",
-      }));
-      setConnecting(false);
-    }, 1500);
+    window.location.href = ApiClient.getGbpOAuthUrl(orgId);
   };
 
   const canProceed = formData.gbpConnected;
@@ -136,10 +341,17 @@ function Step1Gbp({
             </div>
           </div>
         ) : (
+          <>
+          {error && (
+            <div className="flex items-center gap-2 text-sm text-danger">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              {error}
+            </div>
+          )}
           <Button
             className="w-full"
             onClick={handleConnect}
-            disabled={connecting}
+            disabled={connecting || !orgId}
           >
             {connecting ? (
               <>
@@ -153,6 +365,7 @@ function Step1Gbp({
               </>
             )}
           </Button>
+          </>
         )}
 
         <div className="flex justify-end">
@@ -178,11 +391,13 @@ function Step2WhatsApp({
   setFormData,
   onNext,
   onBack,
+  orgId,
 }: {
   formData: FormData;
   setFormData: React.Dispatch<React.SetStateAction<FormData>>;
   onNext: () => void;
   onBack: () => void;
+  orgId: string;
 }) {
   const [code, setCode] = React.useState("");
   const [sentCode, setSentCode] = React.useState(false);
@@ -199,17 +414,29 @@ function Step2WhatsApp({
     setSentCode(true);
   };
 
-  const handleVerify = () => {
+  const handleVerify = async () => {
     if (code.length < 4) {
       setError("Please enter the verification code");
       return;
     }
+    if (!orgId) {
+      setError("Organization not found — complete business signup first");
+      return;
+    }
     setVerifying(true);
     setError("");
-    setTimeout(() => {
+    try {
+      await ApiClient.updateOrg(orgId, {
+        whatsapp_number: formData.whatsappPhone.replace(/\D/g, ""),
+        whatsapp_verified: true,
+        onboarding_status: "whatsapp_connected",
+      } as never);
       setFormData((prev) => ({ ...prev, whatsappConnected: true }));
+    } catch {
+      setError("Failed to save WhatsApp number");
+    } finally {
       setVerifying(false);
-    }, 1200);
+    }
   };
 
   const canProceed = formData.whatsappConnected;
@@ -334,17 +561,19 @@ function Step3Territory({
   setFormData,
   onNext,
   onBack,
+  orgId,
 }: {
   formData: FormData;
   setFormData: React.Dispatch<React.SetStateAction<FormData>>;
   onNext: () => void;
   onBack: () => void;
+  orgId: string;
 }) {
   const [error, setError] = React.useState("");
   const [saving, setSaving] = React.useState(false);
   const [saved, setSaved] = React.useState(false);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formData.territoryAddress.trim()) {
       setError("Please enter your business address");
       return;
@@ -353,17 +582,33 @@ function Step3Territory({
       setError("Please select a business category");
       return;
     }
+    if (!orgId) {
+      setError("Organization not found");
+      return;
+    }
     setError("");
     setSaving(true);
-    setTimeout(() => {
-      setSaving(false);
-      setSaved(true);
-      // Simulate conflict detection for certain addresses
-      const hasConflict = formData.territoryAddress
-        .toLowerCase()
-        .includes("mumbai");
+    try {
+      const check = await ApiClient.checkTerritory(orgId, 12.97, 77.59);
+      const hasConflict = check.data?.has_conflict ?? false;
+      await ApiClient.claimTerritory({
+        org_id: orgId,
+        latitude: 12.97,
+        longitude: 77.59,
+        city: "Bangalore",
+        category: formData.territoryCategory,
+        radius_km: formData.territoryRadius,
+      });
+      await ApiClient.updateOrg(orgId, {
+        onboarding_status: "territory_set",
+      } as never);
       setFormData((prev) => ({ ...prev, territoryConflict: hasConflict }));
-    }, 1200);
+      setSaved(true);
+    } catch {
+      setError("Failed to claim territory");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const canProceed = saved;
@@ -620,6 +865,7 @@ function Step4Complete({
 
 export default function ClientOnboardingPage() {
   const router = useRouter();
+  const { orgId, setOrgId } = useOrgId();
   const [currentStep, setCurrentStep] = React.useState(0);
   const [formData, setFormData] = React.useState<FormData>({
     gbpConnected: false,
@@ -627,10 +873,36 @@ export default function ClientOnboardingPage() {
     whatsappPhone: "",
     whatsappConnected: false,
     territoryAddress: "",
-    territoryCategory: "",
+    territoryCategory: "interior_design",
     territoryRadius: 5,
     territoryConflict: false,
   });
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("gbp") === "connected") {
+      setFormData((prev) => ({ ...prev, gbpConnected: true }));
+      setCurrentStep(1);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    if (!orgId) return;
+    ApiClient.getGbpConnection(orgId)
+      .then((res) => {
+        if (res.data?.connected) {
+          setFormData((prev) => ({
+            ...prev,
+            gbpConnected: true,
+            gbpPlaceId: res.data.place_id || prev.gbpPlaceId,
+          }));
+        }
+      })
+      .catch(() => {});
+  }, [orgId]);
+
+  const effectiveOrgId = orgId || "";
 
   const progressPct = Math.round(
     ((currentStep + 1) / STEPS.length) * 100
@@ -649,6 +921,7 @@ export default function ClientOnboardingPage() {
       </div>
 
       {/* Progress Bar */}
+      {effectiveOrgId && (
       <div>
         <div className="flex items-center justify-between mb-2">
           <span className="text-sm font-medium text-foreground">
@@ -658,8 +931,10 @@ export default function ClientOnboardingPage() {
         </div>
         <Progress value={progressPct} />
       </div>
+      )}
 
       {/* Step Indicators */}
+      {effectiveOrgId && (
       <div className="flex items-center justify-between">
         {STEPS.map((step, i) => (
           <React.Fragment key={step.shortLabel}>
@@ -702,35 +977,49 @@ export default function ClientOnboardingPage() {
           </React.Fragment>
         ))}
       </div>
+      )}
 
       {/* Step Content */}
-      {currentStep === 0 && (
+      {!effectiveOrgId ? (
+        <BusinessSignup onCreated={() => {}} />
+      ) : currentStep === 0 ? (
         <Step1Gbp
           formData={formData}
           setFormData={setFormData}
           onNext={() => setCurrentStep(1)}
+          orgId={effectiveOrgId}
         />
-      )}
-      {currentStep === 1 && (
+      ) : null}
+      {effectiveOrgId && currentStep === 1 && (
         <Step2WhatsApp
           formData={formData}
           setFormData={setFormData}
           onNext={() => setCurrentStep(2)}
           onBack={() => setCurrentStep(0)}
+          orgId={effectiveOrgId}
         />
       )}
-      {currentStep === 2 && (
+      {effectiveOrgId && currentStep === 2 && (
         <Step3Territory
           formData={formData}
           setFormData={setFormData}
           onNext={() => setCurrentStep(3)}
           onBack={() => setCurrentStep(1)}
+          orgId={effectiveOrgId}
         />
       )}
-      {currentStep === 3 && (
+      {effectiveOrgId && currentStep === 3 && (
         <Step4Complete
           formData={formData}
-          onGoToDashboard={() => router.push("/client")}
+          onGoToDashboard={async () => {
+            if (effectiveOrgId) {
+              await ApiClient.updateOrg(effectiveOrgId, {
+                onboarding_status: "active",
+              } as never);
+              setOrgId(effectiveOrgId);
+            }
+            router.push("/client");
+          }}
         />
       )}
     </div>

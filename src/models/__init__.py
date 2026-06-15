@@ -6,8 +6,17 @@ from src.models.gbp import (
     GbpPost,
     GbpPostStatus,
     GbpPostType,
+    GbpProfileSnapshot,
     GbpRanking,
 )
+from src.models.campaign import (
+    CampaignRecipient,
+    CampaignStatus,
+    CampaignType,
+    MarketingCampaign,
+    RecipientStatus,
+)
+from src.models.review import GbpReview, ReviewReplyStatus, ReviewRequest
 from src.models.journey import (
     JourneyEventType,
     UserJourneyEvent,
@@ -37,6 +46,14 @@ from src.models.org import (
     PlanTier,
 )
 from src.models.report import MonthlyReport, ReportStatus
+from src.models.integration import (
+    IntegrationProvider,
+    OrgIntegration,
+    OrgSettings,
+    WebhookEvent,
+    WebhookProvider,
+)
+from src.models.member import OrgMember, OrgMemberRole
 from src.models.territory import (
     KeywordNiche,
     Territory,
@@ -66,6 +83,17 @@ __all__ = [
     "GbpRanking",
     "GbpCompetitor",
     "GbpInsights",
+    "GbpProfileSnapshot",
+    # Campaign
+    "MarketingCampaign",
+    "CampaignRecipient",
+    "CampaignType",
+    "CampaignStatus",
+    "RecipientStatus",
+    # Review
+    "GbpReview",
+    "ReviewRequest",
+    "ReviewReplyStatus",
     # Report
     "MonthlyReport",
     "ReportStatus",
@@ -78,4 +106,17 @@ __all__ = [
     "NotificationChannel",
     "NotificationType",
     "OnboardingEvent",
+    # Integration
+    "OrgIntegration",
+    "IntegrationProvider",
+    "WebhookEvent",
+    "WebhookProvider",
+    "OrgSettings",
+    # Member
+    "OrgMember",
+    "OrgMemberRole",
+    # Journey
+    "JourneyEventType",
+    "UserJourneyEvent",
+    "VoiceCall",
 ]

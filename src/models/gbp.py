@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
 from sqlalchemy import Column, Enum as SAEnum, Index, Text
-from sqlmodel import Field, Relationship, SQLModel
+from sqlmodel import Field, SQLModel
 
 if TYPE_CHECKING:
     from src.models.org import Org
@@ -93,9 +93,6 @@ class GbpPost(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
-    # ── Relationships ────────────────────────────────────────
-    org: Org = Relationship(back_populates="gbp_posts")
-
     # ── Indexes ──────────────────────────────────────────────
     __table_args__ = (
         Index("ix_gbp_posts_org_status", "org_id", "status"),
@@ -113,6 +110,8 @@ class GbpPost(SQLModel, table=True):
             "keyword_target": self.keyword_target,
             "scheduled_at": self.scheduled_at.isoformat() if self.scheduled_at else None,
             "published_at": self.published_at.isoformat() if self.published_at else None,
+            "views": self.views,
+            "clicks": self.clicks,
             "ai_generated": self.ai_generated,
         }
 
@@ -159,9 +158,6 @@ class GbpRanking(SQLModel, table=True):
     # ── Timestamps ───────────────────────────────────────────
     recorded_at: datetime = Field(default_factory=datetime.utcnow, index=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
-
-    # ── Relationships ────────────────────────────────────────
-    org: Org = Relationship(back_populates="gbp_rankings")
 
     # ── Indexes ──────────────────────────────────────────────
     __table_args__ = (
@@ -230,9 +226,6 @@ class GbpCompetitor(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     last_checked_at: datetime | None = Field(default=None)
 
-    # ── Relationships ────────────────────────────────────────
-    org: Org = Relationship(back_populates="gbp_competitors")
-
     # ── Indexes ──────────────────────────────────────────────
     __table_args__ = (
         Index("ix_gbp_competitors_org", "org_id"),
@@ -298,10 +291,61 @@ class GbpInsights(SQLModel, table=True):
     recorded_at: datetime = Field(default_factory=datetime.utcnow)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
-    # ── Relationships ────────────────────────────────────────
-    org: Org = Relationship()
-
     # ── Indexes ──────────────────────────────────────────────
     __table_args__ = (
         Index("ix_gbp_insights_org_period", "org_id", "period_start"),
     )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "org_id": self.org_id,
+            "search_views": self.search_views,
+            "maps_views": self.maps_views,
+            "total_views": self.total_views,
+            "website_clicks": self.website_clicks,
+            "calls": self.calls,
+            "direction_requests": self.direction_requests,
+            "photo_views": self.photo_views,
+            "review_count": self.review_count,
+            "avg_rating": self.avg_rating,
+            "period_start": self.period_start.isoformat() if self.period_start else None,
+            "period_end": self.period_end.isoformat() if self.period_end else None,
+            "recorded_at": self.recorded_at.isoformat() if self.recorded_at else None,
+        }
+
+
+class GbpProfileSnapshot(SQLModel, table=True):
+    """Cached GBP profile content and AI optimization suggestions."""
+
+    __tablename__ = "gbp_profile_snapshots"
+
+    id: str = Field(default_factory=lambda: str(uuid4()), primary_key=True)
+    org_id: str = Field(foreign_key="orgs.id", index=True)
+    title: str | None = Field(default=None, max_length=255)
+    description: str | None = Field(default=None, sa_column=Column(Text))
+    optimized_description: str | None = Field(default=None, sa_column=Column(Text))
+    services_json: str | None = Field(default=None, sa_column=Column(Text))
+    categories_json: str | None = Field(default=None, sa_column=Column(Text))
+    keywords_json: str | None = Field(default=None, sa_column=Column(Text))
+    optimization_score: int = Field(default=0)
+    ai_suggestions_json: str | None = Field(default=None, sa_column=Column(Text))
+    applied: bool = Field(default=False)
+    applied_at: datetime | None = Field(default=None)
+    synced_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+    __table_args__ = (Index("ix_gbp_profile_org", "org_id"),)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "org_id": self.org_id,
+            "title": self.title,
+            "description": self.description,
+            "optimized_description": self.optimized_description,
+            "optimization_score": self.optimization_score,
+            "applied": self.applied,
+            "synced_at": self.synced_at.isoformat() if self.synced_at else None,
+        }

@@ -46,11 +46,15 @@ migrate-create: ## Create new migration
 	@read -p "Migration message: " msg; \
 	alembic revision --autogenerate -m "$$msg"
 
-bootstrap: ## Bootstrap database (create tables + seed)
+bootstrap: ## Bootstrap database (create tables only)
 	python scripts/bootstrap_db.py
 
-seed: ## Seed demo data
-	python scripts/seed_demo_data.py
+gbp-sync: ## Sync GBP data (all orgs)
+	python scripts/run_gbp_sync.py
+
+gbp-sync-org: ## Sync GBP for one org: make gbp-sync-org ORG_ID=uuid
+	python scripts/run_gbp_sync.py --org-id $(ORG_ID)
+
 
 clean: ## Clean up
 	find . -type d -name __pycache__ -exec rm -rf {} +

@@ -59,6 +59,12 @@ export function FunnelChart({ data, isLoading }: FunnelChartProps) {
     );
   }
 
+  const chartData = data.map((item) => ({
+    ...item,
+    label: item.step.replace(/_/g, " "),
+    conversion_pct: item.conversion_from_previous,
+  }));
+
   return (
     <Card>
       <CardHeader>
@@ -70,7 +76,7 @@ export function FunnelChart({ data, isLoading }: FunnelChartProps) {
       <CardContent>
         <ResponsiveContainer width="100%" height={400}>
           <BarChart
-            data={data}
+            data={chartData}
             layout="vertical"
             margin={{ top: 5, right: 60, left: 20, bottom: 5 }}
             barCategoryGap="20%"
@@ -89,16 +95,16 @@ export function FunnelChart({ data, isLoading }: FunnelChartProps) {
                 border: "1px solid #e2e8f0",
                 boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
               }}
-              formatter={(value: number, _name: string, props: { payload: FunnelStep }) => {
-                const step = props.payload;
+              formatter={(value: number, _name: string, item) => {
+                const step = item?.payload as FunnelStep | undefined;
                 return [
-                  `${value} (${step.conversion_pct}% conversion)`,
-                  step.label,
+                  `${value} (${step?.conversion_from_previous ?? 0}% conversion)`,
+                  step?.step ?? _name,
                 ];
               }}
             />
             <Bar dataKey="count" radius={[0, 4, 4, 0]}>
-              {data.map((_entry, index) => (
+              {chartData.map((_entry, index) => (
                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
               ))}
               <LabelList
@@ -113,7 +119,7 @@ export function FunnelChart({ data, isLoading }: FunnelChartProps) {
 
         {/* Conversion indicators */}
         <div className="mt-4 flex flex-wrap gap-2">
-          {data.slice(1).map((step, idx) => (
+          {chartData.slice(1).map((step, idx) => (
             <div
               key={step.step}
               className="flex items-center gap-1.5 rounded-badge bg-gray-50 px-2 py-1 text-xs"

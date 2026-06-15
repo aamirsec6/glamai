@@ -10,19 +10,26 @@ Provides the backend for the admin dashboard showing:
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.api.deps import verify_admin_secret
 from src.database import get_db
+from src.models.gbp import GbpInsights, GbpPost, GbpPostStatus
 from src.models.lead import Lead, LeadSource, LeadStatus
 from src.models.notification import OnboardingEvent
 from src.models.org import OnboardingStatus, Org, PlanTier
 from src.models.report import MonthlyReport
 from src.models.territory import Territory, TerritoryStatus
 
-router = APIRouter(prefix="/v1/admin", tags=["Admin"])
+router = APIRouter(
+    prefix="/v1/admin",
+    tags=["Admin"],
+    dependencies=[Depends(verify_admin_secret)],
+)
 
 
 @router.get("/dashboard")
@@ -184,30 +191,100 @@ async def admin_get_org_detail(
     org_id: str,
     db: AsyncSession = Depends(get_db),
 ):
-    """Get detailed org info including health score."""
+    """Get detailed org info including health score and tenant stats."""
     org = await db.get(Org, org_id)
     if not org:
         raise HTTPException(status_code=404, detail="Organization not found")
 
-    # Calculate health score
     health_score = calculate_org_health(org, db)
 
-    # Recent onboarding events
     event_stmt = (
         select(OnboardingEvent)
         .where(OnboardingEvent.org_id == org_id)
         .order_by(OnboardingEvent.created_at.desc())
-        .limit(10)
+        .limit(20)
     )
     event_result = await db.execute(event_stmt)
     events = event_result.scalars().all()
+
+    lead_result = await db.execute(select(Lead).where(Lead.org_id == org_id))
+    leads = lead_result.scalars().all()
+
+    post_result = await db.execute(select(GbpPost).where(GbpPost.org_id == org_id))
+    posts = post_result.scalars().all()
+
+    territory_result = await db.execute(
+        select(Territory).where(Territory.org_id == org_id)
+    )
+    territories = territory_result.scalars().all()
+
+    insights_result = await db.execute(
+        select(GbpInsights)
+        .where(GbpInsights.org_id == org_id)
+        .order_by(GbpInsights.period_start.desc())
+        .limit(1)
+    )
+    latest_insights = insights_result.scalars().first()
 
     return {
         "data": {
             "org": org.to_dict(),
             "health_score": health_score,
+            "stats": {
+                "leads_total": len(leads),
+                "leads_won": sum(1 for l in leads if l.status == LeadStatus.WON),
+                "gbp_posts_total": len(posts),
+                "gbp_posts_published": sum(
+                    1 for p in posts if p.status == GbpPostStatus.PUBLISHED
+                ),
+                "gbp_connected": bool(org.gbp_place_id),
+                "whatsapp_connected": bool(org.whatsapp_number and org.whatsapp_verified),
+                "territory_claimed": len(territories) > 0,
+                "last_gbp_sync": (
+                    org.gbp_last_synced_at.isoformat() if org.gbp_last_synced_at else None
+                ),
+                "latest_insights_views": (
+                    latest_insights.total_views if latest_insights else None
+                ),
+            },
             "onboarding_events": [
                 {
+                    "type": e.event_type,
+                    "data": e.event_data,
+                    "created_at": e.created_at.isoformat(),
+                }
+                for e in events
+            ],
+        }
+    }
+
+
+@router.get("/orgs/{org_id}/activity")
+async def admin_org_activity(
+    org_id: str,
+    limit: int = Query(50, ge=1, le=200),
+    db: AsyncSession = Depends(get_db),
+):
+    """Tenant activity feed for admin (onboarding + lifecycle events)."""
+    org = await db.get(Org, org_id)
+    if not org:
+        raise HTTPException(status_code=404, detail="Organization not found")
+
+    event_result = await db.execute(
+        select(OnboardingEvent)
+        .where(OnboardingEvent.org_id == org_id)
+        .order_by(OnboardingEvent.created_at.desc())
+        .limit(limit)
+    )
+    events = event_result.scalars().all()
+
+    return {
+        "data": {
+            "org_id": org_id,
+            "org_name": org.name,
+            "events": [
+                {
+                    "id": e.id,
                     "type": e.event_type,
                     "data": e.event_data,
                     "created_at": e.created_at.isoformat(),

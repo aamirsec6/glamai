@@ -17,6 +17,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.api.deps import verify_admin_secret
 from src.database import get_db
 from src.models.journey import JourneyEventType, UserJourneyEvent
 from src.models.lead import Lead, LeadStatus
@@ -77,7 +78,7 @@ async def track_event(
     await db.commit()
 
 
-@router.get("/v1/admin/orgs/{org_id}/journey")
+@router.get("/v1/admin/orgs/{org_id}/journey", dependencies=[Depends(verify_admin_secret)])
 async def get_org_journey(
     org_id: str,
     db: AsyncSession = Depends(get_db),
@@ -151,7 +152,7 @@ async def get_org_journey(
 
 # ── Workflow Insights ──────────────────────────────────────────
 
-@router.get("/v1/admin/workflows/insights")
+@router.get("/v1/admin/workflows/insights", dependencies=[Depends(verify_admin_secret)])
 async def workflow_insights(
     db: AsyncSession = Depends(get_db),
 ):

@@ -19,11 +19,11 @@ import json
 from datetime import datetime
 from typing import Any
 
-import anthropic
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
+from src.connectors.anthropic import AnthropicConnector
 from src.config import get_settings
 from src.models.lead import (
     BudgetRange,
@@ -90,7 +90,7 @@ class LeadQualifier:
     def __init__(self, api_key: str | None = None):
         settings = get_settings()
         self.api_key = api_key or settings.anthropic_api_key
-        self.client = anthropic.AsyncAnthropic(api_key=self.api_key)
+        self._llm = AnthropicConnector()
 
     async def process_message(
         self,
@@ -226,16 +226,7 @@ New message: "{message_text}"
 Respond with JSON only."""
 
         try:
-            response = await self.client.messages.create(
-                model="claude-3-5-haiku-20241022",
-                max_tokens=500,
-                system=system_prompt,
-                messages=[{"role": "user", "content": user_message}],
-            )
-
-            # Parse JSON from response
-            content = response.content[0].text.strip()
-            # Handle potential markdown code blocks
+            content = await self._llm.complete(system_prompt, user_message, max_tokens=500)
             if content.startswith("```"):
                 content = content.split("\n", 1)[1]
                 content = content.rsplit("\n```", 1)[0]

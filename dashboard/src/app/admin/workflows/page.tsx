@@ -4,7 +4,6 @@ import * as React from "react";
 import Link from "next/link";
 import { useWorkflowInsights } from "@/lib/api";
 import { AdminHeader } from "@/components/admin/header";
-import { AdminSidebar } from "@/components/admin/sidebar";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/card";
 import { Button } from "@/components/ui/card";
@@ -16,7 +15,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { AlertTriangle, Clock, TrendingDown, Users, Lightbulb, Activity } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { DropOffPoint, WorkflowBottleneck, ClientNeed } from "@/types";
+import type { DropOffPoint, WorkflowBottleneck, ClientNeed, WorkflowInsight } from "@/types";
 
 // ── Severity helpers ──
 
@@ -113,25 +112,22 @@ function DropOffTooltip({ active, payload }: { active?: boolean; payload?: Toolt
 
 function LoadingState() {
   return (
-    <div className="flex h-screen bg-background">
-      <AdminSidebar />
-      <main className="flex-1 p-6">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {[...Array(4)].map((_, i) => (
-            <Skeleton key={i} className="h-32" />
-          ))}
-        </div>
-        <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <Skeleton className="h-80" />
-          <Skeleton className="h-80" />
-        </div>
-        <div className="mt-6">
-          <Skeleton className="h-48" />
-        </div>
-        <div className="mt-6">
-          <Skeleton className="h-40" />
-        </div>
-      </main>
+    <div className="p-6">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {[...Array(4)].map((_, i) => (
+          <Skeleton key={i} className="h-32" />
+        ))}
+      </div>
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <Skeleton className="h-80" />
+        <Skeleton className="h-80" />
+      </div>
+      <div className="mt-6">
+        <Skeleton className="h-48" />
+      </div>
+      <div className="mt-6">
+        <Skeleton className="h-40" />
+      </div>
     </div>
   );
 }
@@ -145,7 +141,7 @@ export default function AdminWorkflowsPage() {
     return <LoadingState />;
   }
 
-  const insights = data.data;
+  const insights: WorkflowInsight = data.data;
 
   // Sort bottlenecks by failure rate descending
   const sortedBottlenecks: WorkflowBottleneck[] = [...(insights.bottlenecks || [])].sort(
@@ -157,7 +153,7 @@ export default function AdminWorkflowsPage() {
 
   if (insights.clients_needing_help.length > 0) {
     const criticalCount = insights.clients_needing_help.filter(
-      (c) => c.severity === "critical"
+      (c: ClientNeed) => c.severity === "critical"
     ).length;
     if (criticalCount > 0) {
       recommendations.push(
@@ -201,14 +197,12 @@ export default function AdminWorkflowsPage() {
   void sortedBottlenecks;
 
   return (
-    <div className="flex h-screen bg-background">
-      <AdminSidebar />
-      <main className="flex-1 overflow-auto">
-        <AdminHeader
-          title="Workflow Insights"
-          subtitle="AI-powered recommendations to improve client success"
-        />
-        <div className="p-6 space-y-6">
+    <>
+      <AdminHeader
+        title="Workflow Insights"
+        subtitle="AI-powered recommendations to improve client success"
+      />
+      <div className="p-6 space-y-6">
           {/* ── Row 1: Stat Cards ── */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <StatCard
@@ -474,7 +468,6 @@ export default function AdminWorkflowsPage() {
             </CardContent>
           </Card>
         </div>
-      </main>
-    </div>
+    </>
   );
 }

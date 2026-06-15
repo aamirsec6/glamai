@@ -1,14 +1,4 @@
-"""Pre-approved WhatsApp message templates.
-
-Templates must be registered and approved by WhatsApp/Meta before use.
-Each template has a name, language, and variable placeholders.
-
-For MVP, we need these templates:
-1. New lead notification (to designer)
-2. Lead follow-up
-3. Monthly report delivery
-4. Onboarding welcome
-"""
+"""Pre-approved WhatsApp message templates."""
 
 from __future__ import annotations
 
@@ -20,11 +10,6 @@ def get_lead_notification_message(
     budget: str,
     location: str,
 ) -> str:
-    """Generate new lead notification message for the designer.
-
-    This is sent to the interior designer's phone when a new
-    qualified lead comes in via WhatsApp.
-    """
     return (
         f"🆕 *New Lead!*\n\n"
         f"👤 {lead_name}\n"
@@ -36,66 +21,86 @@ def get_lead_notification_message(
     )
 
 
-def get_lead_welcome_message(
-    business_name: str,
-) -> str:
-    """Welcome message sent to leads who first message the business."""
+def get_lead_welcome_message(business_name: str) -> str:
     return (
         f"Hi! Thanks for contacting *{business_name}*! 🏠\n\n"
-        f"We're excited to help you with your interior design project.\n\n"
-        f"A few quick questions to help us understand your needs:\n\n"
-        f"1. What type of space is this for? (home/office/kitchen/etc.)\n"
-        f"2. What's the approximate size? (e.g., 3BHK, 1200 sqft)\n"
-        f"3. What's your budget range?\n"
-        f"4. When are you looking to start?\n\n"
-        f"Feel free to share any reference photos or ideas!"
+        f"We're excited to help you with your project.\n\n"
+        f"A few quick questions:\n"
+        f"1. What type of space is this for?\n"
+        f"2. Approximate size?\n"
+        f"3. Budget range?\n"
+        f"4. When would you like to start?"
     )
 
 
-def get_lead_followup_message(
-    business_name: str,
-) -> str:
-    """Follow-up message for leads who haven't responded."""
+def get_lead_followup_message(business_name: str) -> str:
     return (
         f"Hi! Just checking in from *{business_name}* 👋\n\n"
         f"We'd love to help with your project. "
-        f"When would be a good time for a quick call?\n\n"
-        f"Or simply reply with your preferred time and we'll reach out!"
+        f"When would be a good time for a quick call?"
     )
 
 
-def get_report_delivery_message(
-    business_name: str,
-    month: str,
-    year: int,
-) -> str:
-    """Monthly report delivery notification."""
+def get_report_delivery_message(business_name: str, month: str, year: int) -> str:
     return (
         f"📊 *Your {month} {year} Marketing Report is here!*\n\n"
-        f"Check out how your business performed this month.\n\n"
-        f"Full report attached as PDF. "
-        f"Questions? Just reply to this message!"
+        f"Check out how {business_name} performed this month.\n\n"
+        f"Full report attached as PDF. Questions? Just reply!"
     )
 
 
-def get_onboarding_welcome_message(
-    business_name: str,
-) -> str:
-    """Welcome message for newly onboarded clients."""
+def get_onboarding_welcome_message(business_name: str) -> str:
     return (
         f"Welcome to *GlamAI*! 🎉\n\n"
-        f"We've just started optimizing your Google Business Profile "
-        f"and setting up your WhatsApp lead capture.\n\n"
-        f"Here's what happens next:\n"
-        f"1️⃣ Your GBP will be optimized within 48 hours\n"
-        f"2️⃣ WhatsApp AI will start qualifying leads for you\n"
-        f"3️⃣ First monthly report arrives at month-end\n\n"
-        f"Questions? Reply anytime!"
+        f"We've started optimizing *{business_name}* on Google and WhatsApp.\n\n"
+        f"1️⃣ GBP optimized within 48 hours\n"
+        f"2️⃣ WhatsApp AI qualifies leads 24/7\n"
+        f"3️⃣ First report at month-end"
     )
 
 
-# ── Template definitions for WhatsApp Business API ───────────
-# These need to be registered in Meta Business Manager
+def get_repeat_sale_message(business_name: str, customer_name: str) -> str:
+    return (
+        f"Hi {customer_name}! 👋\n\n"
+        f"It's been a while since we worked together at *{business_name}*.\n\n"
+        f"We have new design packages and seasonal offers — "
+        f"would you like a free consultation for your next project?\n\n"
+        f"Reply YES and we'll call you back."
+    )
+
+
+def get_offer_message(business_name: str, customer_name: str, offer_text: str) -> str:
+    return (
+        f"Hi {customer_name}! 🎉\n\n"
+        f"*{business_name}* has {offer_text}.\n\n"
+        f"Limited slots available this month. Reply INTERESTED to book."
+    )
+
+
+def get_stale_lead_reminder_message(business_name: str, customer_name: str) -> str:
+    return (
+        f"Hi {customer_name}! 👋\n\n"
+        f"You reached out to *{business_name}* recently. "
+        f"We're still here to help with your project.\n\n"
+        f"Reply with a good time to call, or share any updates."
+    )
+
+
+def get_review_request_message(
+    business_name: str,
+    customer_name: str,
+    review_link: str | None = None,
+) -> str:
+    link_line = f"\n\nLeave a review here: {review_link}" if review_link else ""
+    return (
+        f"Hi {customer_name}! ⭐\n\n"
+        f"Thank you for choosing *{business_name}*! "
+        f"We hope you loved the experience.\n\n"
+        f"A quick Google review helps other customers find us."
+        f"{link_line}\n\n"
+        f"It only takes 30 seconds — we really appreciate it!"
+    )
+
 
 TEMPLATE_DEFINITIONS = [
     {
@@ -105,48 +110,29 @@ TEMPLATE_DEFINITIONS = [
         "components": [
             {
                 "type": "BODY",
-                "text": "🆕 New Lead from GlamAI!\n\nName: {{1}}\nPhone: {{2}}\nLocation: {{3}}\nBudget: {{4}}\n\nSummary: {{5}}\n\nReply to update status.",
-            },
-            {
-                "type": "BUTTONS",
-                "buttons": [
-                    {"type": "QUICK_REPLY", "text": "✅ Contacted"},
-                    {"type": "QUICK_REPLY", "text": "📋 Quoted"},
-                    {"type": "QUICK_REPLY", "text": "🎉 Won"},
-                ],
+                "text": "🆕 New Lead from GlamAI!\n\nName: {{1}}\nPhone: {{2}}\nLocation: {{3}}\nBudget: {{4}}\n\nSummary: {{5}}",
             },
         ],
     },
     {
-        "name": "monthly_report_delivery",
+        "name": "review_request",
         "language": "en",
         "category": "UTILITY",
         "components": [
             {
                 "type": "BODY",
-                "text": "📊 Your {{1}} {{2}} Marketing Report is ready!\n\nCheck the attached PDF for your monthly performance summary.\n\nQuestions? Reply to this message!",
+                "text": "Hi {{1}}! Thank you for choosing {{2}}. Could you leave us a quick Google review? {{3}}",
             },
         ],
     },
     {
-        "name": "onboarding_welcome",
+        "name": "repeat_sale_offer",
         "language": "en",
-        "category": "UTILITY",
+        "category": "MARKETING",
         "components": [
             {
                 "type": "BODY",
-                "text": "Welcome to GlamAI! 🎉\n\nWe're setting up your Google Business Profile optimization and WhatsApp lead capture.\n\nHere's what to expect:\n1️⃣ GBP optimized within 48 hours\n2️⃣ WhatsApp AI starts qualifying leads\n3️⃣ First report at month-end\n\nReply anytime for help!",
-            },
-        ],
-    },
-    {
-        "name": "lead_welcome",
-        "language": "en",
-        "category": "UTILITY",
-        "components": [
-            {
-                "type": "BODY",
-                "text": "Hi! Thanks for contacting {{1}}! 🏠\n\nWe'd love to help with your project. Could you share:\n1. What space is this for?\n2. Approximate size?\n3. Budget range?\n4. When you'd like to start?\n\nFeel free to share reference photos too!",
+                "text": "Hi {{1}}! {{2}} has a special offer for returning customers. Reply YES to learn more.",
             },
         ],
     },

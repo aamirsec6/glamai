@@ -2,9 +2,10 @@
 
 import * as React from "react";
 import { useReports } from "@/lib/api";
+import { useOrgId } from "@/lib/org-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants, buttonSizes } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { formatCurrency, calculateChange } from "@/lib/utils";
@@ -48,11 +49,14 @@ function ReportCard({ report, previous }: { report: MonthlyReport; previous?: Mo
               {report.status}
             </Badge>
             {report.pdf_url && (
-              <Button variant="outline" size="sm" asChild>
-                <a href={report.pdf_url} target="_blank" rel="noopener noreferrer">
-                  <Download className="mr-1.5 h-3.5 w-3.5" /> PDF
-                </a>
-              </Button>
+              <a
+                href={report.pdf_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={cn(buttonVariants.outline, buttonSizes.sm, "inline-flex")}
+              >
+                <Download className="mr-1.5 h-3.5 w-3.5" /> PDF
+              </a>
             )}
           </div>
         </div>
@@ -72,7 +76,7 @@ function ReportCard({ report, previous }: { report: MonthlyReport; previous?: Mo
                 {m.icon}<span className="text-xs">{m.label}</span>
               </div>
               <p className="text-lg font-bold text-foreground">{m.value}</p>
-              {"change" in m && m.change !== null ? <ChangeIndicator value={m.change} /> : null}
+              {"change" in m && m.change !== null && m.change !== undefined ? <ChangeIndicator value={m.change} /> : null}
               {"sub" in m && m.sub ? <p className="text-xs text-muted-foreground mt-0.5">{m.sub}</p> : null}
             </div>
           ))}
@@ -104,7 +108,7 @@ function ReportCardSkeleton() {
 }
 
 export default function ClientReportsPage() {
-  const orgId = "demo-org-id";
+  const orgId = useOrgId().orgId || "";
   const { data, isLoading } = useReports(orgId);
   const reports: MonthlyReport[] = data?.data ?? [];
 

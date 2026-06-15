@@ -38,6 +38,8 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 
 async def create_all_tables() -> None:
     """Create all database tables. Use only in development/testing."""
+    import src.models  # noqa: F401 — register all SQLModel metadata
+
     async with _engine.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
 

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 
+from sqlalchemy import select
+
 from src.tasks.celery_app import celery_app
 
 
@@ -69,6 +71,32 @@ async def _generate_monthly_reports() -> dict:
             "failed": failed,
             "period": f"{report_month}/{report_year}",
         }
+
+
+@celery_app.task(bind=True, max_retries=3)
+def generate_report_for_org(self, org_id: str, month: int, year: int) -> dict:
+    """Generate monthly report for a single org."""
+    import asyncio
+
+    return asyncio.run(_generate_report_for_org(org_id, month, year))
+
+
+async def _generate_report_for_org(org_id: str, month: int, year: int) -> dict:
+    from src.database import _async_session_factory
+    from src.facades.analytics import AnalyticsFacade
+
+    async with _async_session_factory() as session:
+        facade = AnalyticsFacade(session)
+        try:
+            result = await facade.generate_monthly_report(
+                org_id, month, year, include_narrative=False
+            )
+            await session.commit()
+            return result
+        except Exception as e:
+            return {"status": "error", "error": str(e)}
+        finally:
+            await facade.close()
 
 
 @celery_app.task(bind=True, max_retries=3)

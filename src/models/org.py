@@ -8,18 +8,11 @@ from __future__ import annotations
 
 import enum
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import Any
 from uuid import uuid4
 
 from sqlalchemy import Column, Enum as SAEnum, Index, Text
-from sqlmodel import Field, Relationship, SQLModel
-
-if TYPE_CHECKING:
-    from src.models.gbp import GbpCompetitor, GbpPost, GbpRanking
-    from src.models.lead import Lead, WhatsappConversation
-    from src.models.notification import NotificationLog
-    from src.models.report import MonthlyReport
-    from src.models.territory import Territory
+from sqlmodel import Field, SQLModel
 
 
 class BusinessCategory(str, enum.Enum):
@@ -143,23 +136,10 @@ class Org(SQLModel, table=True):
     is_active: bool = Field(default=True, index=True)
     notes: str | None = Field(default=None, sa_column=Column(Text))
 
-    # ── Relationships ────────────────────────────────────────
-    territories: list[Territory] = Relationship(back_populates="org")
-    leads: list[Lead] = Relationship(back_populates="org")
-    whatsapp_conversations: list[WhatsappConversation] = Relationship(
-        back_populates="org"
-    )
-    gbp_posts: list[GbpPost] = Relationship(back_populates="org")
-    gbp_rankings: list[GbpRanking] = Relationship(back_populates="org")
-    gbp_competitors: list[GbpCompetitor] = Relationship(back_populates="org")
-    monthly_reports: list[MonthlyReport] = Relationship(back_populates="org")
-    notification_logs: list[NotificationLog] = Relationship(back_populates="org")
-
     # ── Indexes ──────────────────────────────────────────────
     __table_args__ = (
         Index("ix_orgs_category_city", "category", "city"),
         Index("ix_orgs_plan_active", "plan", "is_active"),
-        Index("ix_orgs_onboarding", "onboarding_status"),
     )
 
     # ── Properties ───────────────────────────────────────────
@@ -191,11 +171,39 @@ class Org(SQLModel, table=True):
             "name": self.name,
             "slug": self.slug,
             "category": self.category.value,
+            "description": self.description,
+            "website": self.website,
+            "email": self.email,
+            "phone": self.phone,
+            "address": self.address,
             "city": self.city,
+            "state": self.state,
+            "pincode": self.pincode,
+            "latitude": self.latitude,
+            "longitude": self.longitude,
             "plan": self.plan.value,
             "exclusivity": self.exclusivity.value,
             "onboarding_status": self.onboarding_status.value,
+            "onboarding_started_at": (
+                self.onboarding_started_at.isoformat() if self.onboarding_started_at else None
+            ),
+            "onboarding_completed_at": (
+                self.onboarding_completed_at.isoformat() if self.onboarding_completed_at else None
+            ),
+            "gbp_place_id": self.gbp_place_id,
+            "gbp_name": self.gbp_name,
+            "gbp_status": self.gbp_status,
+            "gbp_last_synced_at": (
+                self.gbp_last_synced_at.isoformat() if self.gbp_last_synced_at else None
+            ),
+            "whatsapp_number": self.whatsapp_number,
+            "whatsapp_verified": self.whatsapp_verified,
+            "whatsapp_connected_at": (
+                self.whatsapp_connected_at.isoformat() if self.whatsapp_connected_at else None
+            ),
             "is_active": self.is_active,
             "billing_amount_inr": self.billing_amount_inr,
+            "billing_amount_paise": self.billing_amount_paise,
             "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }

@@ -3,7 +3,6 @@
 import * as React from "react";
 import { useOrgs, useAdminDashboard } from "@/lib/api";
 import { AdminHeader } from "@/components/admin/header";
-import { AdminSidebar } from "@/components/admin/sidebar";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/card";
@@ -12,7 +11,7 @@ import { EmptyState } from "@/components/ui/card";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/card";
 import { cn, getCategoryLabel, formatRelativeTime } from "@/lib/utils";
 import {
-  Map,
+  Map as MapIcon,
   Shield,
   AlertTriangle,
   MapPin,
@@ -186,42 +185,37 @@ export default function TerritoriesPage() {
   // ── Loading state ──
   if (isLoading && !orgsData && !dashData) {
     return (
-      <div className="flex h-screen bg-background">
-        <AdminSidebar />
-        <main className="flex-1 p-6">
-          <div className="grid grid-cols-4 gap-4">
-            {[...Array(4)].map((_, i) => (
-              <Skeleton key={i} className="h-32" />
-            ))}
-          </div>
-          <div className="mt-6 grid grid-cols-2 gap-6">
-            <Skeleton className="h-64" />
-            <Skeleton className="h-64" />
-          </div>
-          <div className="mt-6">
-            <Skeleton className="h-80" />
-          </div>
-        </main>
+      <div className="p-6">
+        <div className="grid grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <Skeleton key={i} className="h-32" />
+          ))}
+        </div>
+        <div className="mt-6 grid grid-cols-2 gap-6">
+          <Skeleton className="h-64" />
+          <Skeleton className="h-64" />
+        </div>
+        <div className="mt-6">
+          <Skeleton className="h-80" />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex h-screen bg-background">
-      <AdminSidebar />
-      <main className="flex-1 overflow-auto">
-        <AdminHeader
-          title="Territories"
-          subtitle="Manage client territories and exclusivity"
-        />
+    <>
+      <AdminHeader
+        title="Territories"
+        subtitle="Manage client territories and exclusivity"
+      />
 
-        <div className="p-6 space-y-6">
+      <div className="p-6 space-y-6">
           {/* ── Row 1: Stat Cards ── */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <StatCard
               label="Total Territories"
               value={totalTerritories}
-              icon={<Map className="h-5 w-5" />}
+              icon={<MapIcon className="h-5 w-5" />}
             />
             <StatCard
               label="Exclusive Territories"
@@ -365,7 +359,7 @@ export default function TerritoriesPage() {
                 </div>
               ) : territoryRows.length === 0 ? (
                 <EmptyState
-                  icon={<Map className="h-8 w-8" />}
+                  icon={<MapIcon className="h-8 w-8" />}
                   title="No territories found"
                   description="Territories will appear here once clients claim their areas."
                 />
@@ -500,7 +494,6 @@ export default function TerritoriesPage() {
             </CardContent>
           </Card>
         </div>
-      </main>
-    </div>
+    </>
   );
 }

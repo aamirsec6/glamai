@@ -17,6 +17,8 @@ celery_app = Celery(
         "src.tasks.gbp_tasks",
         "src.tasks.report_tasks",
         "src.tasks.notification_tasks",
+        "src.tasks.marketing_tasks",
+        "src.tasks.review_tasks",
     ],
 )
 
@@ -42,7 +44,15 @@ celery_app.conf.update(
         },
         "sync-gbp-insights": {
             "task": "src.tasks.gbp_tasks.sync_gbp_insights",
-            "schedule": crontab(hour=6, minute=0),  # Daily 6 AM IST
+            "schedule": crontab(hour=6, minute=0),
+        },
+        "sync-gbp-competitors": {
+            "task": "src.tasks.gbp_tasks.sync_gbp_competitors",
+            "schedule": crontab(hour=6, minute=30),
+        },
+        "refresh-gbp-tokens": {
+            "task": "src.tasks.gbp_tasks.refresh_expiring_gbp_tokens",
+            "schedule": crontab(hour=5, minute=0),
         },
         # ── Report Tasks ─────────────────────────────────────
         "generate-monthly-reports": {
@@ -56,7 +66,30 @@ celery_app.conf.update(
         },
         "check-territory-conflicts": {
             "task": "src.tasks.notification_tasks.check_territory_conflicts",
-            "schedule": crontab(hour=7, minute=0),  # Daily 7 AM IST
+            "schedule": crontab(hour=7, minute=0),
+        },
+        # ── Review Engine ────────────────────────────────────
+        "sync-all-gbp-reviews": {
+            "task": "src.tasks.review_tasks.sync_all_reviews",
+            "schedule": crontab(hour=6, minute=15),
+        },
+        "auto-reply-gbp-reviews": {
+            "task": "src.tasks.review_tasks.auto_reply_all_reviews",
+            "schedule": crontab(hour=6, minute=45),
+        },
+        # ── Marketing Agent ──────────────────────────────────
+        "repeat-sale-campaigns": {
+            "task": "src.tasks.marketing_tasks.run_repeat_sale_campaigns",
+            "schedule": crontab(day_of_week=1, hour=11, minute=0),
+        },
+        "stale-lead-reminders": {
+            "task": "src.tasks.marketing_tasks.run_stale_lead_reminders",
+            "schedule": crontab(hour=11, minute=30),
+        },
+        # ── GBP Profile ──────────────────────────────────────
+        "optimize-gbp-profiles": {
+            "task": "src.tasks.gbp_tasks.optimize_all_profiles",
+            "schedule": crontab(day_of_week=2, hour=8, minute=0),
         },
     },
 )

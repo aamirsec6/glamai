@@ -48,8 +48,8 @@ glamai/
 │   └── pricing.md
 ├── scripts/
 │   ├── bootstrap_db.py
-│   ├── seed_demo_data.py
-│   └── onboard_client.py
+│   ├── onboard_client.py
+│   └── run_gbp_sync.py
 ├── src/
 │   ├── main.py                  # FastAPI entry point
 │   ├── config.py                # Settings from env

@@ -6,6 +6,7 @@ import type {
   FunnelStep,
   GbpPost,
   GbpRanking,
+  GbpCompetitor,
   Lead,
   MonthlyReport,
   NotificationLog,
@@ -20,8 +21,20 @@ import type {
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+function getOrgHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {};
+  if (typeof window !== "undefined") {
+    const orgId =
+      typeof window !== "undefined" ? localStorage.getItem("glamai_org_id") : "";
+    if (orgId) headers["X-Org-Id"] = orgId;
+  }
+  const adminSecret = process.env.NEXT_PUBLIC_ADMIN_SECRET;
+  if (adminSecret) headers["X-Admin-Secret"] = adminSecret;
+  return headers;
+}
+
 const fetcher = async (url: string) => {
-  const res = await fetch(`${API_BASE}${url}`);
+  const res = await fetch(`${API_BASE}${url}`, { headers: getOrgHeaders() });
   if (!res.ok) {
     const error = new Error("API request failed");
     (error as unknown as { status: number }).status = res.status;
@@ -67,25 +80,55 @@ class ApiClient {
     data: {
       org: Org;
       health_score: { score: number; label: string; reasons: string[] };
+      stats?: {
+        leads_total: number;
+        leads_won: number;
+        gbp_posts_total: number;
+        gbp_posts_published: number;
+        gbp_connected: boolean;
+        whatsapp_connected: boolean;
+        territory_claimed: boolean;
+        last_gbp_sync: string | null;
+        latest_insights_views: number | null;
+      };
       onboarding_events: OnboardingEvent[];
     };
   }> {
     return fetcher(`/api/v1/admin/orgs/${id}`);
   }
 
+  static async getOrgActivity(id: string): Promise<{
+    data: {
+      org_id: string;
+      org_name: string;
+      events: Array<{
+        id: string;
+        type: string;
+        data: string | null;
+        created_at: string;
+      }>;
+    };
+  }> {
+    return fetcher(`/api/v1/admin/orgs/${id}/activity`);
+  }
+
   static async createOrg(data: Partial<Org>): Promise<{ data: Org }> {
     const res = await fetch(`${API_BASE}/api/v1/orgs/`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...getOrgHeaders() },
       body: JSON.stringify(data),
     });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.detail || "Failed to create organization");
+    }
     return res.json();
   }
 
   static async updateOrg(id: string, data: Partial<Org>): Promise<{ data: Org }> {
     const res = await fetch(`${API_BASE}/api/v1/orgs/${id}`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...getOrgHeaders() },
       body: JSON.stringify(data),
     });
     return res.json();
@@ -117,19 +160,36 @@ class ApiClient {
     return fetcher(`/api/v1/leads/?${search}`);
   }
 
-  static async getLead(id: string): Promise<{
+  static async getLead(id: string, org_id: string): Promise<{
     data: Lead & { conversations: WhatsappMessage[] };
   }> {
-    return fetcher(`/api/v1/leads/${id}`);
+    return fetcher(`/api/v1/leads/${id}?org_id=${org_id}`);
   }
 
-  static async updateLead(id: string, data: Partial<Lead>): Promise<{ data: Lead }> {
+  static async updateLead(
+    id: string,
+    data: Partial<Lead> & { org_id: string }
+  ): Promise<{ data: Lead }> {
     const res = await fetch(`${API_BASE}/api/v1/leads/${id}`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...getOrgHeaders() },
       body: JSON.stringify(data),
     });
     return res.json();
+  }
+
+  static async getGbpConnection(org_id: string): Promise<{
+    data: { connected: boolean; place_id: string | null; gbp_name: string | null; last_synced_at: string | null };
+  }> {
+    return fetcher(`/api/v1/gbp/connection?org_id=${org_id}`);
+  }
+
+  static async getGbpInsights(org_id: string): Promise<{ data: Record<string, unknown> | null }> {
+    return fetcher(`/api/v1/gbp/insights?org_id=${org_id}`);
+  }
+
+  static getGbpOAuthUrl(org_id: string): string {
+    return `${API_BASE}/api/v1/gbp/oauth/start?org_id=${org_id}`;
   }
 
   // ── GBP ──
@@ -142,12 +202,94 @@ class ApiClient {
     return fetcher(`/api/v1/gbp/rankings?org_id=${org_id}`);
   }
 
-  static async createGbpPost(data: Partial<GbpPost>): Promise<{ data: GbpPost }> {
-    const res = await fetch(`${API_BASE}/api/v1/gbp/posts`, {
+  static async getGbpCompetitors(org_id: string): Promise<{ data: GbpCompetitor[] }> {
+    return fetcher(`/api/v1/gbp/competitors?org_id=${org_id}`);
+  }
+
+  // ── Members (Clerk) ──
+
+  static async createMember(data: {
+    clerk_user_id: string;
+    org_id: string;
+    role?: string;
+    email?: string | null;
+  }): Promise<{ data: { id: string; org_id: string | null; role: string } }> {
+    const res = await fetch(`${API_BASE}/api/v1/members/`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...getOrgHeaders() },
       body: JSON.stringify(data),
     });
+    if (!res.ok) {
+      throw new Error("Failed to create member");
+    }
+    return res.json();
+  }
+
+  static async getMemberByClerk(clerk_user_id: string): Promise<{
+    data: { org_id: string | null; role: string; email: string | null };
+  }> {
+    return fetcher(`/api/v1/members/by-clerk/${clerk_user_id}`);
+  }
+
+  static async createGbpPost(data: {
+    org_id: string;
+    content: string;
+    title?: string;
+    scheduled_at?: string;
+  }): Promise<{ data: GbpPost }> {
+    const res = await fetch(`${API_BASE}/api/v1/gbp/posts`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...getOrgHeaders() },
+      body: JSON.stringify(data),
+    });
+    return res.json();
+  }
+
+  static async syncGbp(org_id: string, async = true): Promise<{ message: string; task_id?: string; data?: unknown }> {
+    const res = await fetch(`${API_BASE}/api/v1/gbp/sync`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...getOrgHeaders() },
+      body: JSON.stringify({ org_id, async }),
+    });
+    if (!res.ok) throw new Error("GBP sync failed");
+    return res.json();
+  }
+
+  static async generateGbpPosts(org_id: string, async = true): Promise<{ message: string; task_id?: string }> {
+    const res = await fetch(`${API_BASE}/api/v1/gbp/posts/generate?org_id=${org_id}&async=${async}`, {
+      method: "POST",
+      headers: getOrgHeaders(),
+    });
+    if (!res.ok) throw new Error("Post generation failed");
+    return res.json();
+  }
+
+  static async publishGbpPost(post_id: string, org_id: string, async = true): Promise<{ message: string }> {
+    const res = await fetch(
+      `${API_BASE}/api/v1/gbp/posts/${post_id}/publish?org_id=${org_id}&async=${async}`,
+      { method: "POST", headers: getOrgHeaders() }
+    );
+    if (!res.ok) throw new Error("Publish failed");
+    return res.json();
+  }
+
+  static async getIntegrationHealth(org_id?: string): Promise<{
+    data: Array<{ provider: string; status: string; message: string; last_error?: string }>;
+  }> {
+    const q = org_id ? `?org_id=${org_id}` : "";
+    return fetcher(`/api/v1/integrations/health${q}`);
+  }
+
+  static async getAnalyticsSnapshot(org_id: string): Promise<{ data: Record<string, unknown> }> {
+    return fetcher(`/api/v1/analytics/snapshot?org_id=${org_id}`);
+  }
+
+  static async generateReport(org_id: string, async = true): Promise<{ message: string; task_id?: string }> {
+    const res = await fetch(`${API_BASE}/api/v1/reports/generate?org_id=${org_id}&async=${async}`, {
+      method: "POST",
+      headers: getOrgHeaders(),
+    });
+    if (!res.ok) throw new Error("Report generation failed");
     return res.json();
   }
 
@@ -247,6 +389,10 @@ export function useOrgDetail(id: string) {
   return useSWR(id ? `/api/v1/admin/orgs/${id}` : null, fetcher, swrConfig);
 }
 
+export function useOrgActivity(id: string) {
+  return useSWR(id ? `/api/v1/admin/orgs/${id}/activity` : null, fetcher, swrConfig);
+}
+
 export function useLeads(params: { org_id: string; status?: string }) {
   const search = new URLSearchParams({ org_id: params.org_id });
   if (params.status) search.set("status", params.status);
@@ -273,8 +419,28 @@ export function useGbpRankings(orgId: string) {
   return useSWR(orgId ? `/api/v1/gbp/rankings?org_id=${orgId}` : null, fetcher, swrConfig);
 }
 
+export function useGbpConnection(orgId: string) {
+  return useSWR(orgId ? `/api/v1/gbp/connection?org_id=${orgId}` : null, fetcher, swrConfig);
+}
+
+export function useGbpInsights(orgId: string) {
+  return useSWR(orgId ? `/api/v1/gbp/insights?org_id=${orgId}` : null, fetcher, swrConfig);
+}
+
+export function useGbpCompetitors(orgId: string) {
+  return useSWR(orgId ? `/api/v1/gbp/competitors?org_id=${orgId}` : null, fetcher, swrConfig);
+}
+
 export function useReports(orgId: string) {
   return useSWR(orgId ? `/api/v1/reports?org_id=${orgId}` : null, fetcher, swrConfig);
+}
+
+export function useAnalyticsSnapshot(orgId: string) {
+  return useSWR(orgId ? `/api/v1/analytics/snapshot?org_id=${orgId}` : null, fetcher, swrConfig);
+}
+
+export function useIntegrationHealth(orgId: string) {
+  return useSWR(orgId ? `/api/v1/integrations/health?org_id=${orgId}` : null, fetcher, swrConfig);
 }
 
 export function useUserJourney(orgId: string) {

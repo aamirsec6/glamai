@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { useLeads } from "@/lib/api";
+import ApiClient, { useLeads } from "@/lib/api";
+import { useOrgId } from "@/lib/org-context";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -24,10 +25,17 @@ function scoreVariant(s: number | undefined) {
   return s >= 70 ? "success" as const : s >= 40 ? "warning" as const : "danger" as const;
 }
 
-function LeadRow({ lead }: { lead: Lead }) {
+function LeadRow({ lead, orgId }: { lead: Lead; orgId: string }) {
   const [expanded, setExpanded] = React.useState(false);
   const [status, setStatus] = React.useState(lead.status);
-  const score = lead.ai_qualification_score;
+  const score = lead.ai_qualification_score !== undefined
+    ? Math.round((lead.ai_qualification_score <= 1 ? lead.ai_qualification_score * 100 : lead.ai_qualification_score))
+    : undefined;
+
+  const updateStatus = async (newStatus: string) => {
+    setStatus(newStatus as Lead["status"]);
+    await ApiClient.updateLead(lead.id, { org_id: orgId, status: newStatus });
+  };
 
   return (
     <div className="rounded-lg border border-border bg-card shadow-sm overflow-hidden">
@@ -99,11 +107,10 @@ function LeadRow({ lead }: { lead: Lead }) {
             <div>
               <p className="text-xs text-muted-foreground mb-2">Update Status</p>
               <div className="flex flex-wrap gap-2">
-                {status === "new" && <Button size="sm" variant="outline" onClick={() => setStatus("contacted")}><Phone className="mr-1.5 h-3.5 w-3.5" />Mark Contacted</Button>}
-                {(status === "new" || status === "contacted") && <Button size="sm" variant="outline" onClick={() => setStatus("quoted")}><FileText className="mr-1.5 h-3.5 w-3.5" />Mark Quoted</Button>}
-                {status !== "new" && <Button size="sm" variant="outline" onClick={() => setStatus("won")} className="border-success/30 text-success hover:bg-success/10"><CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />Mark Won</Button>}
-                <Button size="sm" variant="outline" onClick={() => setStatus("lost")} className="border-danger/30 text-danger hover:bg-danger/10"><XCircle className="mr-1.5 h-3.5 w-3.5" />Mark Lost</Button>
-                }
+                {status === "new" && <Button size="sm" variant="outline" onClick={() => updateStatus("contacted")}><Phone className="mr-1.5 h-3.5 w-3.5" />Mark Contacted</Button>}
+                {(status === "new" || status === "contacted") && <Button size="sm" variant="outline" onClick={() => updateStatus("quoted")}><FileText className="mr-1.5 h-3.5 w-3.5" />Mark Quoted</Button>}
+                {status !== "new" && <Button size="sm" variant="outline" onClick={() => updateStatus("won")} className="border-success/30 text-success hover:bg-success/10"><CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />Mark Won</Button>}
+                <Button size="sm" variant="outline" onClick={() => updateStatus("lost")} className="border-danger/30 text-danger hover:bg-danger/10"><XCircle className="mr-1.5 h-3.5 w-3.5" />Mark Lost</Button>
               </div>
             </div>
           )}
@@ -114,12 +121,12 @@ function LeadRow({ lead }: { lead: Lead }) {
 }
 
 export default function ClientLeadsPage() {
-  const orgId = "demo-org-id";
+  const { orgId } = useOrgId();
   const [statusFilter, setStatusFilter] = React.useState<Filter>("all");
   const [searchQuery, setSearchQuery] = React.useState("");
 
   const { data, isLoading } = useLeads({
-    org_id: orgId,
+    org_id: orgId || "",
     status: statusFilter === "all" ? undefined : statusFilter,
   });
 
@@ -166,7 +173,7 @@ export default function ClientLeadsPage() {
             description={searchQuery ? "No leads match your search. Try a different query." : "You don't have any leads yet. Complete onboarding to start receiving leads."} />
         </CardContent></Card>
       ) : (
-        <div className="space-y-3">{filtered.map((lead) => <LeadRow key={lead.id} lead={lead} />)}</div>
+        <div className="space-y-3">{filtered.map((lead) => <LeadRow key={lead.id} lead={lead} orgId={orgId || ""} />)}</div>
       )}
     </div>
   );

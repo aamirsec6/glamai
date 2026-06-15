@@ -46,14 +46,13 @@ class UserJourneyEvent(SQLModel, table=True):
     )
 
     # ── Ownership ────────────────────────────────────────────
-    org_id: str = Field(max_length=255, index=True)
+    org_id: str = Field(foreign_key="orgs.id", index=True)
     session_id: str = Field(max_length=255, index=True)
 
     # ── Event Details ────────────────────────────────────────
     event_type: str = Field(
         max_length=50,
-        sa_column=Column(SAEnum(JourneyEventType)),
-        index=True,
+        sa_column=Column(SAEnum(JourneyEventType), index=True),
     )
     page: str | None = Field(default=None, max_length=255)
     element: str | None = Field(default=None, max_length=255)
@@ -89,7 +88,7 @@ class VoiceCall(SQLModel, table=True):
     )
 
     # ── Ownership ────────────────────────────────────────────
-    org_id: str = Field(max_length=255, index=True)
+    org_id: str = Field(foreign_key="orgs.id", index=True)
 
     # ── Call Details ─────────────────────────────────────────
     phone_number: str = Field(max_length=20, index=True)
@@ -102,7 +101,7 @@ class VoiceCall(SQLModel, table=True):
     ai_summary: str | None = Field(default=None, max_length=500)
     appointment_booked: bool = Field(default=False)
     appointment_time: datetime | None = Field(default=None)
-    sentiment: str | None = Field(default=None, max_length=20)  | None  # positive, neutral, negative
+    sentiment: str | None = Field(default=None, max_length=20)  # positive, neutral, negative
 
     # ── Provider ─────────────────────────────────────────────
     provider: str = Field(default="exotel", max_length=50)  # exotel, twilio, etc.

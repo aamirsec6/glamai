@@ -26,14 +26,15 @@ async def _send_lead_notification(
     lead_summary: str,
 ) -> dict:
     """Async implementation."""
+    from src.config import get_settings
     from src.database import _async_session_factory
     from src.models.lead import Lead
-    from src.models.org import Org
     from src.models.notification import (
         NotificationChannel,
         NotificationLog,
         NotificationType,
     )
+    from src.models.org import Org
     from src.services.whatsapp.client import WhatsappClient
     from src.services.whatsapp.templates import get_lead_notification_message
 
@@ -53,8 +54,15 @@ async def _send_lead_notification(
         )
 
         # In production: send via WhatsappClient
-        # client = WhatsappClient(api_key=...)
-        # result = await client.send_text_message(org.phone, message)
+        settings = get_settings()
+        if settings.whatsapp_api_key or settings.whatsapp_360dialog_api_key:
+            client = WhatsappClient(
+                api_key=settings.whatsapp_api_key or settings.whatsapp_360dialog_api_key,
+                base_url=settings.whatsapp_base_url,
+            )
+            if org.phone:
+                await client.send_text_message(to_phone=org.phone, message=message)
+            await client.close()
 
         # Log the notification
         log = NotificationLog(
@@ -128,3 +136,97 @@ async def _send_monthly_report(
         await session.commit()
 
         return {"status": "delivered", "period": report.period_label}
+
+
+@celery_app.task(bind=True, max_retries=3)
+def check_onboarding_reminders(self) -> dict:
+    """Remind orgs stuck in onboarding."""
+    import asyncio
+
+    return asyncio.run(_check_onboarding_reminders())
+
+
+async def _check_onboarding_reminders() -> dict:
+    import structlog
+    from sqlalchemy import select
+
+    from src.database import _async_session_factory
+    from src.models.notification import NotificationChannel, NotificationLog, NotificationType
+    from src.models.org import OnboardingStatus, Org
+
+    logger = structlog.get_logger(__name__)
+    reminded = 0
+    cutoff = datetime.utcnow() - timedelta(days=3)
+
+    async with _async_session_factory() as session:
+        stmt = select(Org).where(
+            Org.onboarding_status.notin_(
+                [OnboardingStatus.ACTIVE, OnboardingStatus.ONBOARDING_COMPLETE, OnboardingStatus.CHURNED]
+            ),
+            Org.is_active == True,  # noqa: E712
+            Org.created_at <= cutoff,
+        )
+        result = await session.execute(stmt)
+        orgs = result.scalars().all()
+
+        for org in orgs:
+            log = NotificationLog(
+                org_id=org.id,
+                channel=NotificationChannel.IN_APP,
+                notification_type=NotificationType.ONBOARDING_REMINDER,
+                recipient=org.email,
+                body=f"Complete your GlamAI setup — currently at {org.onboarding_status.value}",
+                sent=True,
+                sent_at=datetime.utcnow(),
+            )
+            session.add(log)
+            reminded += 1
+            logger.info("onboarding_reminder_sent", org_id=org.id)
+
+        await session.commit()
+
+    return {"reminded": reminded}
+
+
+@celery_app.task(bind=True, max_retries=3)
+def check_territory_conflicts(self) -> dict:
+    """Check for new territory conflicts among active orgs."""
+    import asyncio
+
+    return asyncio.run(_check_territory_conflicts())
+
+
+async def _check_territory_conflicts() -> dict:
+    import structlog
+    from sqlalchemy import select
+
+    from src.database import _async_session_factory
+    from src.models.org import Org
+    from src.models.territory import Territory, TerritoryStatus
+    from src.services.territory.checker import TerritoryChecker
+
+    logger = structlog.get_logger(__name__)
+    conflicts = 0
+
+    async with _async_session_factory() as session:
+        stmt = select(Territory).where(Territory.status == TerritoryStatus.ACTIVE)
+        result = await session.execute(stmt)
+        territories = result.scalars().all()
+        checker = TerritoryChecker()
+
+        for territory in territories:
+            org = await session.get(Org, territory.org_id)
+            if not org or org.latitude is None or org.longitude is None:
+                continue
+            check = await checker.check_conflict(
+                new_org=org,
+                latitude=territory.center_latitude,
+                longitude=territory.center_longitude,
+                db=session,
+            )
+            if check.get("has_conflict"):
+                conflicts += 1
+                logger.warning("territory_conflict_detected", org_id=org.id)
+
+    return {"conflicts_found": conflicts}
+

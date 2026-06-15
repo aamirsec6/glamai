@@ -1,15 +1,23 @@
 "use client";
 
 import * as React from "react";
-import { cn, getHealthColor, getHealthBgColor, getHealthLabel } from "@/lib/utils";
+import { cn, getHealthColor, getHealthBg, getHealthLabel } from "@/lib/utils";
 import type { OrgHealth } from "@/types";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertTriangle, CheckCircle, Info } from "lucide-react";
 
+type HealthScoreData = OrgHealth & {
+  factors?: { type: string; label: string; detail?: string }[];
+  last_login_days_ago?: number;
+  onboarding_step?: string;
+  gbp_sync_status?: string;
+  whatsapp_status?: string;
+};
+
 interface HealthScoreProps {
-  health?: OrgHealth;
+  health?: HealthScoreData;
   isLoading?: boolean;
   orgName?: string;
 }
@@ -45,7 +53,7 @@ export function HealthScore({ health, isLoading, orgName }: HealthScoreProps) {
 
   const score = health.score;
   const colorClass = getHealthColor(score);
-  const bgClass = getHealthBgColor(score);
+  const bgClass = getHealthBg(score);
   const label = getHealthLabel(score);
 
   return (
@@ -110,11 +118,11 @@ export function HealthScore({ health, isLoading, orgName }: HealthScoreProps) {
         />
 
         {/* Factors */}
-        {health.factors.length > 0 && (
+        {(health.factors?.length ?? 0) > 0 && (
           <div className="space-y-2">
             <h4 className="text-sm font-medium text-text">Factors</h4>
             <div className="space-y-2">
-              {health.factors.map((factor, idx) => (
+              {health.factors!.map((factor, idx) => (
                 <div
                   key={idx}
                   className="flex items-start gap-2 rounded-badge bg-gray-50 px-3 py-2"
@@ -147,13 +155,13 @@ export function HealthScore({ health, isLoading, orgName }: HealthScoreProps) {
             <p className="text-sm font-medium text-text">
               {health.last_login_days_ago === 0
                 ? "Today"
-                : `${health.last_login_days_ago}d ago`}
+                : `${health.last_login_days_ago ?? 0}d ago`}
             </p>
           </div>
           <div className="rounded-badge bg-gray-50 p-3">
             <p className="text-xs text-muted">Onboarding</p>
             <p className="text-sm font-medium text-text capitalize">
-              {health.onboarding_step.replace("_", " ")}
+              {(health.onboarding_step ?? "unknown").replace("_", " ")}
             </p>
           </div>
           <div className="rounded-badge bg-gray-50 p-3">
@@ -168,7 +176,7 @@ export function HealthScore({ health, isLoading, orgName }: HealthScoreProps) {
                   : "text-danger-600"
               )}
             >
-              {health.gbp_sync_status}
+              {health.gbp_sync_status ?? "unknown"}
             </p>
           </div>
           <div className="rounded-badge bg-gray-50 p-3">
@@ -181,7 +189,7 @@ export function HealthScore({ health, isLoading, orgName }: HealthScoreProps) {
                   : "text-danger-600"
               )}
             >
-              {health.whatsapp_status}
+              {health.whatsapp_status ?? "unknown"}
             </p>
           </div>
         </div>

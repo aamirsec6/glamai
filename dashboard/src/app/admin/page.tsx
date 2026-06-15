@@ -3,7 +3,6 @@
 import * as React from "react";
 import { useAdminDashboard, useOnboardingFunnel } from "@/lib/api";
 import { AdminHeader } from "@/components/admin/header";
-import { AdminSidebar } from "@/components/admin/sidebar";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/card";
@@ -21,17 +20,14 @@ export default function AdminOverviewPage() {
 
   if (dashLoading || !dashboard) {
     return (
-      <div className="flex h-screen bg-background">
-        <AdminSidebar />
-        <main className="flex-1 p-6">
-          <div className="grid grid-cols-4 gap-4">
-            {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-32" />)}
-          </div>
-          <div className="mt-6 grid grid-cols-2 gap-4">
-            <Skeleton className="h-80" />
-            <Skeleton className="h-80" />
-          </div>
-        </main>
+      <div className="p-6">
+        <div className="grid grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-32" />)}
+        </div>
+        <div className="mt-6 grid grid-cols-2 gap-4">
+          <Skeleton className="h-80" />
+          <Skeleton className="h-80" />
+        </div>
       </div>
     );
   }
@@ -59,11 +55,9 @@ export default function AdminOverviewPage() {
   ];
 
   return (
-    <div className="flex h-screen bg-background">
-      <AdminSidebar />
-      <main className="flex-1 overflow-auto">
-        <AdminHeader title="Dashboard" subtitle="Overview of all clients and metrics" />
-        <div className="p-6 space-y-6">
+    <>
+      <AdminHeader title="Dashboard" subtitle="Overview of all clients and metrics" />
+      <div className="p-6 space-y-6">
           {/* Stat Cards */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <StatCard label="Total Clients" value={d.orgs.total} icon={<Users className="h-5 w-5" />} />
@@ -152,12 +146,13 @@ export default function AdminOverviewPage() {
                 <div className="space-y-4">
                   {Object.entries(d.orgs.by_plan).map(([plan, count]) => {
                     const total = d.orgs.total || 1;
-                    const pct = Math.round((count / total) * 100);
+                    const planCount = count as number;
+                    const pct = Math.round((planCount / total) * 100);
                     return (
                       <div key={plan}>
                         <div className="flex items-center justify-between mb-1">
                           <span className="text-sm font-medium capitalize text-foreground">{plan}</span>
-                          <span className="text-sm text-muted-foreground">{count} ({pct}%)</span>
+                          <span className="text-sm text-muted-foreground">{planCount} ({pct}%)</span>
                         </div>
                         <Progress value={pct} className="h-2" />
                       </div>
@@ -205,7 +200,6 @@ export default function AdminOverviewPage() {
             </Card>
           </div>
         </div>
-      </main>
-    </div>
+    </>
   );
 }

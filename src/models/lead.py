@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
 from sqlalchemy import Column, Enum as SAEnum, Index, Text
-from sqlmodel import Field, Relationship, SQLModel
+from sqlmodel import Field, SQLModel
 
 if TYPE_CHECKING:
     from src.models.notification import NotificationLog
@@ -151,13 +151,6 @@ class Lead(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
-    # ── Relationships ────────────────────────────────────────
-    org: Org = Relationship(back_populates="leads")
-    conversations: list[WhatsappConversation] = Relationship(
-        back_populates="lead"
-    )
-    notifications: list[NotificationLog] = Relationship(back_populates="lead")
-
     # ── Indexes ──────────────────────────────────────────────
     __table_args__ = (
         Index("ix_leads_org_status", "org_id", "status"),
@@ -279,10 +272,6 @@ class WhatsappConversation(SQLModel, table=True):
     # ── Timestamps ───────────────────────────────────────────
     sent_at: datetime = Field(default_factory=datetime.utcnow)
     created_at: datetime = Field(default_factory=datetime.utcnow)
-
-    # ── Relationships ────────────────────────────────────────
-    org: Org = Relationship(back_populates="whatsapp_conversations")
-    lead: Lead = Relationship(back_populates="conversations")
 
     # ── Indexes ──────────────────────────────────────────────
     __table_args__ = (

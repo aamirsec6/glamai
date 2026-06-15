@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
 from sqlalchemy import Column, Enum as SAEnum, Index, UniqueConstraint
-from sqlmodel import Field, Relationship, SQLModel
+from sqlmodel import Field, SQLModel
 
 if TYPE_CHECKING:
     from src.models.org import Org
@@ -138,13 +138,9 @@ class Territory(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     released_at: datetime | None = Field(default=None)
 
-    # ── Relationships ────────────────────────────────────────
-    org: Org = Relationship(back_populates="territories")
-
     # ── Indexes ──────────────────────────────────────────────
     __table_args__ = (
         Index("ix_territories_city_category", "city", "category"),
-        Index("ix_territories_status", "status"),
         Index("ix_territories_coords", "center_latitude", "center_longitude"),
     )
 

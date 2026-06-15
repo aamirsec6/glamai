@@ -13,7 +13,7 @@ const badgeVariants = {
 };
 
 export interface BadgeProps
-  extends React.HTMLAttributes<HTMLHTMLSpanElement> {
+  extends React.HTMLAttributes<HTMLSpanElement> {
   variant?: keyof typeof badgeVariants;
 }
 

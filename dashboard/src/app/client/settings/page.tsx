@@ -309,7 +309,7 @@ export default function ClientSettingsPage() {
                 Permanently delete your account and all data. This cannot be undone.
               </p>
             </div>
-            <Button variant="destructive" size="sm">
+            <Button variant="danger" size="sm">
               <Trash2 className="h-4 w-4 mr-1.5" />
               Cancel Account
             </Button>

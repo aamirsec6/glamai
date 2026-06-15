@@ -109,17 +109,44 @@ class GbpClient:
     # ── Locations ─────────────────────────────────────────────
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
+    async def list_accounts(self, access_token: str) -> list[dict[str, Any]]:
+        """List GBP accounts accessible to the OAuth user."""
+        response = await self._client.get(
+            "https://mybusinessaccountmanagement.googleapis.com/v1/accounts",
+            headers={"Authorization": f"Bearer {access_token}"},
+            params={"pageSize": 20},
+        )
+        response.raise_for_status()
+        return response.json().get("accounts", [])
+
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     async def list_locations(
         self,
         access_token: str,
-        account_id: str = "accounts/~0",
+        account_name: str | None = None,
     ) -> list[dict[str, Any]]:
-        """List all business locations for an account."""
+        """List business locations for an account."""
+        if not account_name:
+            accounts = await self.list_accounts(access_token)
+            if not accounts:
+                return []
+            account_name = accounts[0]["name"]
+
         response = await self._client.get(
-            f"{GBP_API_ACCOUNTS}/{account_id}/locations",
+            f"https://mybusinessbusinessinformation.googleapis.com/v1/{account_name}/locations",
             headers={"Authorization": f"Bearer {access_token}"},
-            params={"pageSize": 100},
+            params={
+                "pageSize": 100,
+                "readMask": "name,title,storefrontAddress,metadata",
+            },
         )
+        if response.status_code == 404:
+            # Fallback to legacy v4 API
+            response = await self._client.get(
+                f"{GBP_API_ACCOUNTS}/{account_name}/locations",
+                headers={"Authorization": f"Bearer {access_token}"},
+                params={"pageSize": 100},
+            )
         response.raise_for_status()
         data = response.json()
         return data.get("locations", [])
@@ -133,6 +160,25 @@ class GbpClient:
         response = await self._client.get(
             f"{GBP_API_BASE}/{location_name}",
             headers={"Authorization": f"Bearer {access_token}"},
+        )
+        response.raise_for_status()
+        return response.json()
+
+    async def update_location(
+        self,
+        access_token: str,
+        location_name: str,
+        description: str,
+    ) -> dict[str, Any]:
+        """Update GBP location profile description."""
+        response = await self._client.patch(
+            f"{GBP_API_BASE}/{location_name}",
+            headers={
+                "Authorization": f"Bearer {access_token}",
+                "Content-Type": "application/json",
+            },
+            json={"profile": {"description": description}},
+            params={"updateMask": "profile.description"},
         )
         response.raise_for_status()
         return response.json()
@@ -305,21 +351,21 @@ class GbpClient:
         latitude: float,
         longitude: float,
         radius_meters: int = 5000,
+        included_types: list[str] | None = None,
     ) -> list[dict[str, Any]]:
-        """Search for competing businesses using Google Places API.
-
-        Note: This uses the Places API (not GBP API).
-        Requires a separate Places API key.
-        """
-        # Using Places API New (v1)
+        """Search for competing businesses using Google Places API (New)."""
+        types = included_types or ["establishment"]
         response = await self._client.post(
             "https://places.googleapis.com/v1/places:searchNearby",
             headers={
                 "X-Goog-Api-Key": place_api_key,
-                "X-Goog-FieldMask": "places.displayName,places.id,placeFormattedAddress,places.rating,placeUserRatingCount,places.photos",
+                "X-Goog-FieldMask": (
+                    "places.id,places.displayName,places.formattedAddress,"
+                    "places.rating,places.userRatingCount,places.location"
+                ),
             },
             json={
-                "includedTypes": ["interior_designer", "interior_design_company"],
+                "includedTypes": types,
                 "maxResultCount": 20,
                 "locationRestriction": {
                     "circle": {
@@ -327,7 +373,7 @@ class GbpClient:
                             "latitude": latitude,
                             "longitude": longitude,
                         },
-                        "radius": radius_meters,
+                        "radius": float(radius_meters),
                     }
                 },
             },

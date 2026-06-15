@@ -7,8 +7,8 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
-from sqlalchemy import Column, Enum as SAEnum, Index
-from sqlmodel import Field, Relationship, SQLModel
+from sqlalchemy import Column, Enum as SAEnum, Index, Text
+from sqlmodel import Field, SQLModel
 
 if TYPE_CHECKING:
     from src.models.lead import Lead
@@ -33,6 +33,9 @@ class NotificationType(str, enum.Enum):
     TERRITORY_CONFLICT = "territory_conflict"
     GUARANTEE_MILESTONE = "guarantee_milestone"
     ONBOARDING_REMINDER = "onboarding_reminder"
+    CAMPAIGN_MESSAGE = "campaign_message"
+    REVIEW_REQUEST = "review_request"
+    REPEAT_SALE_OFFER = "repeat_sale_offer"
     SYSTEM = "system"
 
 
@@ -84,10 +87,6 @@ class NotificationLog(SQLModel, table=True):
     # ── Timestamps ───────────────────────────────────────────
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
-    # ── Relationships ────────────────────────────────────────
-    org: Org = Relationship(back_populates="notification_logs")
-    lead: Lead = Relationship(back_populates="notifications")
-
     # ── Indexes ──────────────────────────────────────────────
     __table_args__ = (
         Index("ix_notifications_org_type", "org_id", "notification_type"),
@@ -134,9 +133,6 @@ class OnboardingEvent(SQLModel, table=True):
 
     # ── Timestamps ───────────────────────────────────────────
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
-
-    # ── Relationships ────────────────────────────────────────
-    org: Org = Relationship()
 
     # ── Indexes ──────────────────────────────────────────────
     __table_args__ = (

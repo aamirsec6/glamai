@@ -15,6 +15,9 @@ import {
   Sparkles,
 } from "lucide-react";
 import { UserButton } from "@clerk/nextjs";
+import { isClerkEnabled } from "@/lib/auth-config";
+import { ClientAuthGuard } from "@/components/auth/client-auth-guard";
+import { useOrgId } from "@/lib/org-context";
 import { useOrgDashboard } from "@/lib/api";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -35,8 +38,8 @@ export default function ClientLayout({
 }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = React.useState(false);
-  const orgId = "demo-org-id";
-  const { data, isLoading } = useOrgDashboard(orgId);
+  const { orgId } = useOrgId();
+  const { data, isLoading } = useOrgDashboard(orgId || "");
 
   const org = data?.data?.org;
   const onboardingComplete = data?.data?.onboarding?.is_complete;
@@ -53,6 +56,7 @@ export default function ClientLayout({
   const currentStepNum = stepMap[currentStep] ?? 0;
 
   return (
+    <ClientAuthGuard>
     <div className="flex h-screen bg-background">
       {/* Sidebar */}
       <aside
@@ -85,8 +89,9 @@ export default function ClientLayout({
         <nav className="flex-1 space-y-1 p-3">
           {navItems.map((item) => {
             const isActive =
-              pathname === item.href ||
-              pathname.startsWith(item.href + "/");
+              item.href === "/client"
+                ? pathname === "/client"
+                : pathname === item.href || pathname.startsWith(item.href + "/");
             return (
               <Link
                 key={item.href}
@@ -146,7 +151,13 @@ export default function ClientLayout({
             )}
           </div>
           <div className="flex items-center gap-3">
-            <UserButton afterSignOutUrl="/" />
+            {isClerkEnabled ? (
+              <UserButton afterSignOutUrl="/" />
+            ) : (
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-xs font-medium text-primary-foreground">
+                D
+              </div>
+            )}
           </div>
         </header>
 
@@ -171,5 +182,6 @@ export default function ClientLayout({
         <main className="flex-1 overflow-auto p-6">{children}</main>
       </div>
     </div>
+    </ClientAuthGuard>
   );
 }

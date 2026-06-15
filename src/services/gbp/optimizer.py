@@ -10,9 +10,9 @@ import json
 from datetime import datetime
 from typing import Any
 
-import anthropic
 import structlog
 
+from src.connectors.anthropic import AnthropicConnector
 from src.config import get_settings
 from src.models.gbp import GbpPost, GbpPostType
 from src.models.org import Org
@@ -93,7 +93,7 @@ class GbpPostGenerator:
     def __init__(self, api_key: str | None = None):
         settings = get_settings()
         self.api_key = api_key or settings.anthropic_api_key
-        self.client = anthropic.AsyncAnthropic(api_key=self.api_key)
+        self._llm = AnthropicConnector()
 
     async def generate_post(
         self,
@@ -159,14 +159,7 @@ Example style: {template['example']}
 Respond with JSON only."""
 
         try:
-            response = await self.client.messages.create(
-                model="claude-3-5-haiku-20241022",
-                max_tokens=500,
-                system=system_prompt,
-                messages=[{"role": "user", "content": user_message}],
-            )
-
-            content = response.content[0].text.strip()
+            content = await self._llm.complete(system_prompt, user_message, max_tokens=500)
             if content.startswith("```"):
                 content = content.split("\n", 1)[1]
                 content = content.rsplit("\n```", 1)[0]

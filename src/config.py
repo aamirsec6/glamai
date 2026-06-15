@@ -36,6 +36,13 @@ class Settings(BaseSettings):
     # ── Redis ────────────────────────────────────────────────
     redis_url: str = "redis://localhost:6379/0"
 
+    # ── Security ─────────────────────────────────────────────
+    encryption_key: str = Field(default="", repr=False)
+    admin_api_secret: str = Field(default="", repr=False)
+    whatsapp_webhook_verify_token: str = Field(
+        default="glamai-webhook-verify", repr=False
+    )
+
     # ── WhatsApp (360dialog) ─────────────────────────────────
     whatsapp_provider: Literal["360dialog", "meta_direct"] = "360dialog"
     whatsapp_api_key: str = Field(default="", repr=False)
@@ -80,11 +87,16 @@ class Settings(BaseSettings):
     territory_gym_radius_km: float = 5.0
 
     # ── Feature Flags ────────────────────────────────────────
-    feature_review_engine: bool = False
-    feature_reengagement: bool = False
-    feature_content_generator: bool = False
+    feature_review_engine: bool = True
+    feature_reengagement: bool = True
+    feature_content_generator: bool = True
     feature_multi_city: bool = False
     feature_multi_vertical: bool = False
+
+    # ── Marketing Agent ──────────────────────────────────────
+    campaign_repeat_sale_days: int = 14
+    campaign_stale_lead_days: int = 7
+    review_request_delay_hours: int = 24
 
     # ── API Keys ─────────────────────────────────────────────
     anthropic_api_key: str = Field(default="", repr=False)

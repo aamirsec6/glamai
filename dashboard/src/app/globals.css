@@ -30,10 +30,56 @@
   border-color: hsl(var(--border));
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   background-color: hsl(var(--background));
   color: hsl(var(--foreground));
   font-family: "Inter", system-ui, -apple-system, sans-serif;
+}
+
+@layer components {
+  .landing-page {
+    @apply bg-white text-slate-900;
+  }
+
+  .landing-section {
+    @apply py-16 sm:py-24;
+  }
+
+  .landing-container {
+    @apply mx-auto max-w-6xl px-4 sm:px-6 lg:px-8;
+  }
+
+  .landing-gradient-bg {
+    background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 35%, #faf5ff 70%, #ffffff 100%);
+  }
+
+  .landing-purple-gradient {
+    background: linear-gradient(135deg, #6366f1 0%, #7c3aed 50%, #8b5cf6 100%);
+  }
+
+  .landing-card {
+    @apply rounded-2xl border border-slate-200/80 bg-white shadow-sm;
+  }
+
+  .landing-chip {
+    @apply rounded-full border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-medium text-violet-800 transition-colors hover:border-violet-300 hover:bg-violet-100;
+  }
+
+  .landing-btn-primary {
+    @apply inline-flex items-center justify-center rounded-full bg-violet-600 px-6 py-3 text-sm font-semibold text-white shadow-md shadow-violet-600/20 transition-all hover:bg-violet-700 hover:shadow-lg;
+  }
+
+  .landing-btn-outline {
+    @apply inline-flex items-center justify-center rounded-full border-2 border-violet-600 px-6 py-3 text-sm font-semibold text-violet-700 transition-colors hover:bg-violet-50;
+  }
+
+  .landing-eyebrow {
+    @apply text-sm font-semibold uppercase tracking-wider text-violet-600;
+  }
 }
 
 @layer base {

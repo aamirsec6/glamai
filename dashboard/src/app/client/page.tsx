@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useOrgDashboard } from "@/lib/api";
+import { useOrgDashboard, useReports, useAnalyticsSnapshot } from "@/lib/api";
+import { useOrgId } from "@/lib/org-context";
 import {
   Card, CardContent, CardHeader, CardTitle, CardDescription,
 } from "@/components/ui/card";
@@ -10,6 +11,7 @@ import {
   Badge, Skeleton, StatCard, Progress, StatusBadge, EmptyState, Button,
 } from "@/components/ui/card";
 import { formatCurrency, formatRelativeTime } from "@/lib/utils";
+import type { Lead } from "@/types";
 import {
   Users, IndianRupee, TrendingUp, Eye, FileText, MapPin,
   CheckCircle2, AlertCircle, Clock, ArrowRight,
@@ -23,8 +25,9 @@ const ONBOARDING_STEPS = [
 ];
 
 export default function ClientDashboardPage() {
-  const orgId = "demo-org-id";
-  const { data: dashboard, isLoading } = useOrgDashboard(orgId);
+  const { orgId } = useOrgId();
+  const { data: dashboard, isLoading } = useOrgDashboard(orgId || "");
+  const { data: reportsData } = useReports(orgId || "");
 
   const d = dashboard?.data;
   const org = d?.org;
@@ -37,14 +40,30 @@ export default function ClientDashboardPage() {
       ? 100
       : Math.round((stepIndex / ONBOARDING_STEPS.length) * 100);
 
-  const recentLeads = d?.leads?.recent ?? [];
+  const recentLeads: Lead[] = d?.leads?.recent ?? [];
   const leadsByStatus = d?.leads?.by_status ?? {};
   const totalLeads = d?.leads?.total ?? 0;
   const wonLeads = leadsByStatus["won"] ?? 0;
   const conversionRate =
     totalLeads > 0 ? Math.round((wonLeads / totalLeads) * 100) : 0;
-  const revenue = wonLeads * 50000;
+  const latestReport = reportsData?.data?.[0];
+  const revenue =
+    latestReport?.total_estimated_revenue_inr ??
+    (recentLeads.filter((l) => l.status === "won").reduce(
+      (sum, l) => sum + (l.won_value_inr ?? 0),
+      0
+    ));
+  const { data: analyticsData } = useAnalyticsSnapshot(orgId || "");
+  const analytics = analyticsData?.data as {
+    scores?: { overall?: number; lead_generation?: number; gbp_visibility?: number };
+    recommendations?: string[];
+    anomalies?: string[];
+  } | undefined;
   const gbpConnected = !!org?.gbp_place_id;
+  const overallScore = analytics?.scores?.overall;
+  const gbpViews = (analytics?.scores?.gbp_visibility ?? 0) > 0
+    ? String(Math.round((analytics?.scores?.gbp_visibility ?? 0) * 10))
+    : "—";
 
   if (isLoading) {
     return (
@@ -109,8 +128,27 @@ export default function ClientDashboardPage() {
         <StatCard label="Leads This Month" value={totalLeads} icon={<Users className="h-5 w-5" />} />
         <StatCard label="Conversion Rate" value={`${conversionRate}%`} icon={<TrendingUp className="h-5 w-5" />} />
         <StatCard label="Revenue" value={formatCurrency(revenue)} icon={<IndianRupee className="h-5 w-5" />} />
-        <StatCard label="GBP Views" value="—" icon={<Eye className="h-5 w-5" />} />
+        <StatCard label="GBP Views" value={gbpViews} icon={<Eye className="h-5 w-5" />} />
+        {overallScore != null && (
+          <StatCard label="Health Score" value={`${overallScore}`} icon={<TrendingUp className="h-5 w-5" />} />
+        )}
       </div>
+
+      {analytics?.recommendations && analytics.recommendations.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Insights</CardTitle>
+            <CardDescription>From your analysis engine</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
+              {analytics.recommendations.slice(0, 3).map((r) => (
+                <li key={r}>{r}</li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Two Columns: Recent Leads + GBP Summary */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -195,12 +233,52 @@ export default function ClientDashboardPage() {
           </Link>
         </CardHeader>
         <CardContent>
-          <EmptyState
-            icon={<FileText className="h-8 w-8" />}
-            title="No reports yet"
-            description="Your first report will be generated at the end of the month."
-            action={<Link href="/client/reports"><Button size="sm">View Reports<ArrowRight className="ml-2 h-4 w-4" /></Button></Link>}
-          />
+          {latestReport ? (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-foreground">{latestReport.period}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {latestReport.leads_total} leads · {latestReport.leads_won} won
+                  </p>
+                </div>
+                <Badge variant={latestReport.status === "delivered" ? "success" : "info"}>
+                  {latestReport.status}
+                </Badge>
+              </div>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div className="rounded-lg border border-border p-3">
+                  <p className="text-xs text-muted-foreground">Revenue</p>
+                  <p className="text-lg font-bold text-foreground">
+                    {formatCurrency(latestReport.total_estimated_revenue_inr)}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-border p-3">
+                  <p className="text-xs text-muted-foreground">GBP Views</p>
+                  <p className="text-lg font-bold text-foreground">
+                    {latestReport.gbp_total_views.toLocaleString()}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-border p-3">
+                  <p className="text-xs text-muted-foreground">New Reviews</p>
+                  <p className="text-lg font-bold text-foreground">{latestReport.reviews_new}</p>
+                </div>
+                <div className="rounded-lg border border-border p-3">
+                  <p className="text-xs text-muted-foreground">Avg Rating</p>
+                  <p className="text-lg font-bold text-foreground">
+                    {latestReport.avg_rating ? `${latestReport.avg_rating}★` : "—"}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <EmptyState
+              icon={<FileText className="h-8 w-8" />}
+              title="No reports yet"
+              description="Your first report will be generated at the end of the month."
+              action={<Link href="/client/reports"><Button size="sm">View Reports<ArrowRight className="ml-2 h-4 w-4" /></Button></Link>}
+            />
+          )}
         </CardContent>
       </Card>
     </div>

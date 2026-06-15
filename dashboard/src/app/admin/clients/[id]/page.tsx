@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import {
+import ApiClient, {
   useOrgDetail,
   useLeads,
   useGbpPosts,
@@ -13,7 +13,6 @@ import {
   useUserJourney,
 } from "@/lib/api";
 import { AdminHeader } from "@/components/admin/header";
-import { AdminSidebar } from "@/components/admin/sidebar";
 import { HealthScore } from "@/components/admin/health-score";
 import { JourneyTimeline } from "@/components/admin/journey-timeline";
 import {
@@ -24,7 +23,7 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants, buttonSizes } from "@/components/ui/button";
 import {
   Table,
   TableHeader,
@@ -37,7 +36,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
-import { cn, formatCurrency, formatDate, formatRelativeTime } from "@/lib/utils";
+import { cn, formatCurrency, formatCurrencyFull, formatDate, formatRelativeTime } from "@/lib/utils";
 import type {
   Org,
   Lead,
@@ -46,6 +45,7 @@ import type {
   GbpCompetitor,
   MonthlyReport,
   OnboardingEvent,
+  UserJourneyEvent,
 } from "@/types";
 import {
   Users,
@@ -153,6 +153,11 @@ function getStatusBadgeVariant(
 
 function convertOrgHealth(detail: {
   health_score?: { score: number; label: string; reasons: string[] };
+  org?: {
+    onboarding_status?: string;
+    gbp_status?: string;
+    whatsapp_verified?: boolean;
+  };
 }): {
   score: number;
   max_score: number;
@@ -357,36 +362,29 @@ export default function ClientDetailPage() {
 
   // ── Status Update Handler ──
   const handleStatusUpdate = async (leadId: string, newStatus: string) => {
-    // Optimistic update
-    const { updateLead } = await import("@/lib/api");
-    await updateLead(leadId, { status: newStatus } as Partial<Lead>);
+    await ApiClient.updateLead(leadId, { org_id: id, status: newStatus });
     mutateLeads();
   };
 
   if (orgLoading && !org) {
     return (
-      <div className="flex h-screen bg-background">
-        <AdminSidebar />
-        <main className="flex-1 p-6">
-          <div className="space-y-6">
-            <Skeleton className="h-16 w-full" />
-            <div className="grid grid-cols-4 gap-4">
-              {[...Array(4)].map((_, i) => (
-                <Skeleton key={i} className="h-32" />
-              ))}
-            </div>
+      <div className="p-6">
+        <div className="space-y-6">
+          <Skeleton className="h-16 w-full" />
+          <div className="grid grid-cols-4 gap-4">
+            {[...Array(4)].map((_, i) => (
+              <Skeleton key={i} className="h-32" />
+            ))}
           </div>
-        </main>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex h-screen bg-background">
-      <AdminSidebar />
-      <main className="flex-1 overflow-auto">
-        {/* Header */}
-        <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b border-border bg-card px-6">
+    <>
+      {/* Header */}
+      <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b border-border bg-card px-6">
           <div className="flex items-center gap-3">
             <Link href="/admin/clients">
               <Button variant="ghost" size="sm">
@@ -730,12 +728,6 @@ export default function ClientDetailPage() {
                       icon={<Users className="h-8 w-8" />}
                       title="No leads found"
                       description="This client hasn't generated any leads yet."
-                      action={
-                        <Button size="sm">
-                          <MessageSquare className="h-4 w-4 mr-2" />
-                          Initiate Outreach
-                        </Button>
-                      }
                     />
                   ) : (
                     <Table>
@@ -1338,21 +1330,19 @@ export default function ClientDetailPage() {
                             </div>
                           </div>
                           {report.pdf_url && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="w-full mt-2"
-                              asChild
+                            <a
+                              href={report.pdf_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className={cn(
+                                buttonVariants.outline,
+                                buttonSizes.sm,
+                                "inline-flex w-full mt-2"
+                              )}
                             >
-                              <a
-                                href={report.pdf_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                              >
-                                <Download className="h-4 w-4 mr-2" />
-                                Download PDF
-                              </a>
-                            </Button>
+                              <Download className="h-4 w-4 mr-2" />
+                              Download PDF
+                            </a>
                           )}
                         </CardContent>
                       </Card>
@@ -1518,7 +1508,7 @@ export default function ClientDetailPage() {
                   <CardContent>
                     {rankingRows.length > 0 ? (
                       <div className="flex flex-wrap gap-2">
-                        {[...new Set(rankingRows.map((r) => r.keyword))].map(
+                        {Array.from(new Set(rankingRows.map((r) => r.keyword))).map(
                           (keyword) => (
                             <Badge
                               key={keyword}
@@ -1597,7 +1587,6 @@ export default function ClientDetailPage() {
             </TabsContent>
           </Tabs>
         </div>
-      </main>
-    </div>
+    </>
   );
 }

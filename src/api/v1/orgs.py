@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from typing import Any
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select as sqlmodel_select
@@ -14,6 +15,7 @@ from sqlmodel import select as sqlmodel_select
 from src.database import get_db
 from src.models.lead import Lead, LeadStatus
 from src.models.notification import NotificationLog, OnboardingEvent
+from src.services.tenant.audit import log_tenant_event
 from src.models.org import (
     BusinessCategory,
     ExclusivityTier,
@@ -23,6 +25,7 @@ from src.models.org import (
 )
 from src.models.territory import Territory
 from src.services.territory.checker import TerritoryChecker
+from src.api.deps import assert_tenant_access
 
 router = APIRouter(prefix="/v1/orgs", tags=["Organizations"])
 
@@ -53,6 +56,40 @@ class OrgUpdateSchema(BaseModel):
     plan: PlanTier | None = None
     onboarding_status: OnboardingStatus | None = None
     notes: str | None = None
+    whatsapp_number: str | None = None
+    whatsapp_verified: bool | None = None
+    latitude: float | None = None
+    longitude: float | None = None
+    address: str | None = None
+    city: str | None = None
+
+
+_ONBOARDING_ORDER = [
+    OnboardingStatus.CREATED,
+    OnboardingStatus.GBP_CONNECTED,
+    OnboardingStatus.WHATSAPP_CONNECTED,
+    OnboardingStatus.TERRITORY_SET,
+    OnboardingStatus.ONBOARDING_COMPLETE,
+    OnboardingStatus.ACTIVE,
+]
+
+
+def _validate_onboarding_transition(
+    current: OnboardingStatus, new: OnboardingStatus
+) -> None:
+    """Prevent skipping onboarding steps."""
+    if new in (OnboardingStatus.PAUSED, OnboardingStatus.CHURNED):
+        return
+    try:
+        cur_idx = _ONBOARDING_ORDER.index(current)
+        new_idx = _ONBOARDING_ORDER.index(new)
+    except ValueError:
+        return
+    if new_idx > cur_idx + 1:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot skip onboarding from {current.value} to {new.value}",
+        )
 
 
 class OrgDetailSchema(BaseModel):
@@ -124,12 +161,13 @@ async def create_org(
     )
 
     db.add(org)
+    await db.flush()
 
     # Track onboarding event
     event = OnboardingEvent(
         org_id=org.id,
         event_type="signup",
-        event_data=f'{"category": "{data.category.value}"}',
+        event_data=json.dumps({"category": data.category.value}),
     )
     db.add(event)
 
@@ -150,9 +188,12 @@ async def create_org(
 @router.get("/{org_id}", response_model=dict)
 async def get_org(
     org_id: str,
+    x_org_id: str | None = Header(default=None, alias="X-Org-Id"),
+    x_admin_secret: str | None = Header(default=None, alias="X-Admin-Secret"),
     db: AsyncSession = Depends(get_db),
 ):
     """Get organization details."""
+    assert_tenant_access(org_id, x_org_id, x_admin_secret)
     org = await db.get(Org, org_id)
     if not org:
         raise HTTPException(status_code=404, detail="Organization not found")
@@ -164,20 +205,49 @@ async def get_org(
 async def update_org(
     org_id: str,
     data: OrgUpdateSchema,
+    x_org_id: str | None = Header(default=None, alias="X-Org-Id"),
+    x_admin_secret: str | None = Header(default=None, alias="X-Admin-Secret"),
     db: AsyncSession = Depends(get_db),
 ):
     """Update organization details."""
+    assert_tenant_access(org_id, x_org_id, x_admin_secret)
     org = await db.get(Org, org_id)
     if not org:
         raise HTTPException(status_code=404, detail="Organization not found")
 
     update_data = data.model_dump(exclude_unset=True)
+    prev_status = org.onboarding_status
+    if "onboarding_status" in update_data and update_data["onboarding_status"] is not None:
+        _validate_onboarding_transition(org.onboarding_status, update_data["onboarding_status"])
+        if update_data["onboarding_status"] in (
+            OnboardingStatus.ONBOARDING_COMPLETE,
+            OnboardingStatus.ACTIVE,
+        ):
+            org.onboarding_completed_at = datetime.utcnow()
+
+    if "whatsapp_number" in update_data and update_data["whatsapp_number"]:
+        update_data["whatsapp_number"] = update_data["whatsapp_number"].strip().lstrip("+")
+        org.whatsapp_connected_at = datetime.utcnow()
+
     for key, value in update_data.items():
         if value is not None:
             setattr(org, key, value)
 
     org.updated_at = datetime.utcnow()
     db.add(org)
+
+    if (
+        "onboarding_status" in update_data
+        and update_data["onboarding_status"] is not None
+        and org.onboarding_status != prev_status
+    ):
+        await log_tenant_event(
+            db,
+            org_id,
+            org.onboarding_status.value,
+            {"from": prev_status.value},
+        )
+
     await db.commit()
     await db.refresh(org)
 
@@ -187,9 +257,12 @@ async def update_org(
 @router.get("/{org_id}/dashboard", response_model=dict)
 async def get_org_dashboard(
     org_id: str,
+    x_org_id: str | None = Header(default=None, alias="X-Org-Id"),
+    x_admin_secret: str | None = Header(default=None, alias="X-Admin-Secret"),
     db: AsyncSession = Depends(get_db),
 ):
     """Get organization dashboard data (leads, GBP, reports summary)."""
+    assert_tenant_access(org_id, x_org_id, x_admin_secret)
     org = await db.get(Org, org_id)
     if not org:
         raise HTTPException(status_code=404, detail="Organization not found")

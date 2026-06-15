@@ -10,10 +10,18 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.config import get_settings
+import src.models  # noqa: F401 — register all SQLModel mappers before routes run
 from src.api.v1.admin import router as admin_router
+from src.api.v1.campaigns import router as campaigns_router
+from src.api.v1.gbp_reviews import router as gbp_reviews_router
+from src.api.v1.analytics import router as analytics_router
+from src.api.v1.integrations import router as integrations_router
 from src.api.v1.gbp import router as gbp_router
 from src.api.v1.leads import router as leads_router
+from src.api.v1.members import router as members_router
+from src.api.v1.notifications import router as notifications_router
 from src.api.v1.orgs import router as orgs_router
+from src.api.v1.reports import router as reports_router
 from src.api.v1.territory import router as territory_router
 from src.api.v1.tracking import router as tracking_router
 from src.services.whatsapp.webhook import router as whatsapp_webhook_router
@@ -65,9 +73,16 @@ app.add_middleware(
 app.include_router(orgs_router, prefix="/api")
 app.include_router(leads_router, prefix="/api")
 app.include_router(gbp_router, prefix="/api")
+app.include_router(reports_router, prefix="/api")
+app.include_router(notifications_router, prefix="/api")
+app.include_router(members_router, prefix="/api")
 app.include_router(territory_router, prefix="/api")
+app.include_router(integrations_router, prefix="/api")
+app.include_router(analytics_router, prefix="/api")
 app.include_router(admin_router, prefix="/api")
 app.include_router(tracking_router, prefix="/api")
+app.include_router(campaigns_router, prefix="/api")
+app.include_router(gbp_reviews_router, prefix="/api")
 app.include_router(whatsapp_webhook_router, prefix="/api/webhooks")
 
 
@@ -75,11 +90,34 @@ app.include_router(whatsapp_webhook_router, prefix="/api/webhooks")
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint."""
+    """Health check endpoint with dependency status."""
+    import redis.asyncio as aioredis
+    from sqlalchemy import text
+
+    from src.database import _engine
+
+    db_ok = False
+    redis_ok = False
+    try:
+        async with _engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+            db_ok = True
+    except Exception:
+        pass
+    try:
+        r = aioredis.from_url(settings.redis_url)
+        await r.ping()
+        await r.aclose()
+        redis_ok = True
+    except Exception:
+        pass
+
+    status = "healthy" if db_ok and redis_ok else "degraded"
     return {
-        "status": "healthy",
+        "status": status,
         "version": "0.1.0",
         "environment": settings.app_env,
+        "checks": {"database": db_ok, "redis": redis_ok},
     }
 
 

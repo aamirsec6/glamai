@@ -18,7 +18,8 @@ const StatCard = React.forwardRef<HTMLDivElement, StatCardProps>(
     const isNegative = change !== undefined && change < 0;
 
     return (
-      <Card ref={ref} className={cn("", className)}>
+      <div ref={ref}>
+      <Card className={cn("", className)}>
         <CardContent className="p-6">
           <div className="flex items-start justify-between">
             <div className="space-y-2">
@@ -59,6 +60,7 @@ const StatCard = React.forwardRef<HTMLDivElement, StatCardProps>(
           </div>
         </CardContent>
       </Card>
+      </div>
     );
   }
 );

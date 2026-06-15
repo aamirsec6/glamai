@@ -3,7 +3,6 @@
 import * as React from "react";
 import { useOnboardingFunnel, useOrgs, useAdminDashboard } from "@/lib/api";
 import { AdminHeader } from "@/components/admin/header";
-import { AdminSidebar } from "@/components/admin/sidebar";
 import { FunnelChart } from "@/components/admin/funnel-chart";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/card";
@@ -135,36 +134,31 @@ export default function OnboardingAnalyticsPage() {
   // ── Loading state ──
   if (isLoading && !funnel && !orgsData && !dashboard) {
     return (
-      <div className="flex h-screen bg-background">
-        <AdminSidebar />
-        <main className="flex-1 p-6">
-          <div className="grid grid-cols-4 gap-4">
-            {[...Array(4)].map((_, i) => (
-              <Skeleton key={i} className="h-32" />
-            ))}
-          </div>
-          <div className="mt-6">
-            <Skeleton className="h-96" />
-          </div>
-          <div className="mt-6 grid grid-cols-2 gap-6">
-            <Skeleton className="h-64" />
-            <Skeleton className="h-64" />
-          </div>
-        </main>
+      <div className="p-6">
+        <div className="grid grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <Skeleton key={i} className="h-32" />
+          ))}
+        </div>
+        <div className="mt-6">
+          <Skeleton className="h-96" />
+        </div>
+        <div className="mt-6 grid grid-cols-2 gap-6">
+          <Skeleton className="h-64" />
+          <Skeleton className="h-64" />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex h-screen bg-background">
-      <AdminSidebar />
-      <main className="flex-1 overflow-auto">
-        <AdminHeader
-          title="Onboarding Analytics"
-          subtitle="Track client onboarding progress"
-        />
+    <>
+      <AdminHeader
+        title="Onboarding Analytics"
+        subtitle="Track client onboarding progress"
+      />
 
-        <div className="p-6 space-y-6">
+      <div className="p-6 space-y-6">
           {/* ── Row 1: Stat Cards ── */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <StatCard
@@ -485,7 +479,6 @@ export default function OnboardingAnalyticsPage() {
             </CardContent>
           </Card>
         </div>
-      </main>
-    </div>
+    </>
   );
 }

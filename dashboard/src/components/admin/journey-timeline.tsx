@@ -142,7 +142,7 @@ export function JourneyTimeline({ events, isLoading }: JourneyTimelineProps) {
                   <div className="flex-1 min-w-0 rounded-badge bg-gray-50 px-3 py-2">
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-sm font-medium text-text truncate">
-                        {event.description}
+                        {event.page ?? event.event_type.replace(/_/g, " ")}
                       </p>
                       <span className="shrink-0 text-xs text-muted">
                         {formatRelativeTime(event.created_at)}

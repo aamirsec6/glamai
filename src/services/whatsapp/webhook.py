@@ -17,7 +17,9 @@ import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.config import get_settings
 from src.database import get_db
+from src.models.integration import WebhookProvider
 from src.models.lead import (
     Lead,
     LeadSource,
@@ -28,7 +30,9 @@ from src.models.lead import (
 )
 from src.models.org import OnboardingStatus, Org
 from src.services.ai.lead_qualifier import LeadQualifier
+from src.services.webhook_idempotency import is_webhook_processed, record_webhook_event
 from src.services.whatsapp.templates import get_lead_notification_message
+from src.tasks.notification_tasks import send_lead_notification
 
 logger = structlog.get_logger(__name__)
 
@@ -120,6 +124,9 @@ class WhatsappWebhookHandler:
     ) -> dict[str, Any]:
         """Process a single inbound WhatsApp message."""
         message_id = message.get("id", "")
+        if message_id and await is_webhook_processed(db, WebhookProvider.WHATSAPP, message_id):
+            return {"status": "duplicate", "message_id": message_id}
+
         from_phone = message.get("from", "")
         message_type = message.get("type", "text")
         timestamp = message.get("timestamp", "")
@@ -139,6 +146,11 @@ class WhatsappWebhookHandler:
         org = await self._find_org_by_whatsapp(to_phone, db)
         if not org:
             logger.warning("webhook_org_not_found", to_phone=to_phone)
+            if message_id:
+                await record_webhook_event(
+                    db, WebhookProvider.WHATSAPP, message_id, None,
+                    success=False, error_message="org_not_found",
+                )
             return {"status": "org_not_found"}
 
         if org.onboarding_status not in (
@@ -201,6 +213,12 @@ class WhatsappWebhookHandler:
         # Notify designer if this is a new lead or significant update
         if ai_response.get("notify_designer"):
             await self._notify_designer(org, lead, ai_response, db)
+            send_lead_notification.delay(
+                org.id, lead.id, lead.ai_summary or ai_response.get("reply", "")
+            )
+
+        if message_id:
+            await record_webhook_event(db, WebhookProvider.WHATSAPP, message_id, org.id)
 
         await db.commit()
 
@@ -335,12 +353,31 @@ async def verify_webhook(request: Request):
     verify_token = params.get("hub.verify_token", "")
 
     # In production, verify the token against stored value
-    settings_verify_token = "glamai-webhook-verify"  # Should come from settings
+    settings_verify_token = get_settings().whatsapp_webhook_verify_token
 
     if verify_token == settings_verify_token:
-        return {"hub.challenge": challenge}
+        from fastapi.responses import PlainTextResponse
+
+        return PlainTextResponse(content=challenge)
 
     raise HTTPException(status_code=403, detail="Verification failed")
+
+
+def _build_webhook_handler() -> WhatsappWebhookHandler:
+    settings = get_settings()
+    from src.services.whatsapp.client import WhatsappClient
+
+    client = WhatsappClient(
+        api_key=settings.whatsapp_api_key or settings.whatsapp_360dialog_api_key,
+        base_url=settings.whatsapp_base_url,
+        webhook_secret=settings.whatsapp_webhook_secret,
+    )
+    ai = LeadQualifier(api_key=settings.anthropic_api_key)
+    return WhatsappWebhookHandler(
+        webhook_secret=settings.whatsapp_webhook_secret,
+        whatsapp_client=client,
+        ai_qualifier=ai,
+    )
 
 
 @router.post("/")
@@ -351,14 +388,23 @@ async def receive_webhook(
 ):
     """Receive inbound WhatsApp messages via webhook."""
     body = await request.body()
+    settings = get_settings()
+    from src.facades.leads import LeadFacade
 
-    # In production: validate signature
-    # handler = WhatsappWebhookHandler(...)
-    # if not handler.validate_signature(body, x_hub_signature_256):
-    #     raise HTTPException(status_code=403, detail="Invalid signature")
+    facade = LeadFacade(db)
 
-    payload = await request.json()
+    if settings.whatsapp_webhook_secret and x_hub_signature_256:
+        if not facade.validate_signature(body, x_hub_signature_256):
+            raise HTTPException(status_code=403, detail="Invalid signature")
 
-    logger.info("webhook_received", payload_keys=list(payload.get("entry", [{}])[0].get("changes", [{}])[0].get("value", {}).keys()) if payload.get("entry") else "empty")
+    import json as json_lib
 
-    return {"status": "received"}
+    payload = json_lib.loads(body)
+    logger.info("webhook_received", has_entry=bool(payload.get("entry")))
+
+    try:
+        result = await facade.handle_inbound_webhook(payload)
+        return result
+    except Exception as e:
+        logger.exception("webhook_processing_failed", error=str(e))
+        raise HTTPException(status_code=500, detail="Webhook processing failed") from e

@@ -1,7 +1,15 @@
 "use client";
 
 import * as React from "react";
-import { useGbpPosts, useGbpRankings } from "@/lib/api";
+import ApiClient, {
+  useGbpPosts,
+  useGbpRankings,
+  useGbpConnection,
+  useGbpInsights,
+  useGbpCompetitors,
+  useIntegrationHealth,
+} from "@/lib/api";
+import { useOrgId } from "@/lib/org-context";
 import {
   Card,
   CardContent,
@@ -36,58 +44,6 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-/* ── Mock data (replace with API call when available) ── */
-
-const MOCK_CONNECTED = true;
-const MOCK_LAST_SYNC = "2026-06-09T08:30:00Z";
-const MOCK_PLACE_ID = "ChIJN1t_tDeuEmsRUsoyG83frY4";
-
-const MOCK_INSIGHTS = {
-  searchViews: 3420,
-  mapsViews: 1850,
-  websiteClicks: 214,
-  calls: 47,
-  directionRequests: 32,
-};
-
-const MOCK_COMPETITORS: GbpCompetitor[] = [
-  {
-    id: "comp-1",
-    org_id: "demo-org-id",
-    name: "Smile Dental Clinic",
-    category: "dentist",
-    city: "Mumbai",
-    distance_km: 0.8,
-    is_glamai_client: false,
-    review_count: 142,
-    avg_rating: 4.7,
-  },
-  {
-    id: "comp-2",
-    org_id: "demo-org-id",
-    name: "Bright Dental Care",
-    category: "dentist",
-    city: "Mumbai",
-    distance_km: 1.2,
-    is_glamai_client: false,
-    review_count: 89,
-    avg_rating: 4.5,
-  },
-  {
-    id: "comp-3",
-    org_id: "demo-org-id",
-    name: "Perfect Smile",
-    category: "dentist",
-    city: "Mumbai",
-    distance_km: 2.1,
-    is_glamai_client: true,
-    review_count: 56,
-    avg_rating: 4.3,
-  },
-];
-
-/* ── Helpers ── */
-
 function positionColor(pos?: number) {
   if (!pos) return "text-muted-foreground";
   if (pos <= 3) return "text-success";
@@ -105,14 +61,64 @@ function TrendArrow({ position }: { position?: number }) {
   return <TrendingDown className="h-4 w-4 text-danger" />;
 }
 
-/* ── Page ── */
-
 export default function ClientGbpPage() {
-  const orgId = "demo-org-id";
-  const { data: postsData, isLoading: postsLoading } = useGbpPosts(orgId);
+  const { orgId } = useOrgId();
+  const [syncing, setSyncing] = React.useState(false);
+  const [generating, setGenerating] = React.useState(false);
+  const { data: postsData, isLoading: postsLoading, mutate: mutatePosts } = useGbpPosts(orgId || "");
   const { data: rankingsData, isLoading: rankingsLoading } =
-    useGbpRankings(orgId);
+    useGbpRankings(orgId || "");
+  const { data: connectionData, mutate: mutateConnection } = useGbpConnection(orgId || "");
+  const { data: insightsData, mutate: mutateInsights } = useGbpInsights(orgId || "");
+  const { data: healthData } = useIntegrationHealth(orgId || "");
+  const { data: competitorsData, mutate: mutateCompetitors } = useGbpCompetitors(orgId || "");
 
+  const connectorHealth: { provider: string; status: string; message?: string }[] =
+    healthData?.data ?? [];
+  const healthColor = (status: string) => {
+    if (status === "connected" || status === "ready") return "bg-success/10 text-success border-success/20";
+    if (status === "configured") return "bg-warning/10 text-warning border-warning/20";
+    if (status === "skipped") return "bg-muted text-muted-foreground";
+    return "bg-danger/10 text-danger border-danger/20";
+  };
+
+  const handleSync = async () => {
+    if (!orgId) return;
+    setSyncing(true);
+    try {
+      await ApiClient.syncGbp(orgId);
+      setTimeout(() => {
+        mutateConnection();
+        mutateInsights();
+        mutateCompetitors();
+        mutatePosts();
+      }, 3000);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const handleGeneratePosts = async () => {
+    if (!orgId) return;
+    setGenerating(true);
+    try {
+      await ApiClient.generateGbpPosts(orgId);
+      setTimeout(() => mutatePosts(), 5000);
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const handleConnect = () => {
+    if (!orgId) return;
+    window.location.href = ApiClient.getGbpOAuthUrl(orgId);
+  };
+
+  const connected = connectionData?.data?.connected ?? false;
+  const lastSync = connectionData?.data?.last_synced_at;
+  const placeId = connectionData?.data?.place_id;
+  const insights = insightsData?.data;
+  const competitors: GbpCompetitor[] = competitorsData?.data ?? [];
   const posts: GbpPost[] = postsData?.data ?? [];
   const rankings: GbpRanking[] = rankingsData?.data ?? [];
   const isLoading = postsLoading || rankingsLoading;
@@ -129,10 +135,31 @@ export default function ClientGbpPage() {
             Insights, posts, and local SEO performance
           </p>
         </div>
-        <Button variant="outline" size="sm">
-          <RefreshCw className="mr-2 h-4 w-4" />
-          Sync Now
-        </Button>
+        <div className="flex gap-2">
+          {!connected && orgId && (
+            <Button size="sm" onClick={handleConnect}>
+              Connect Google
+            </Button>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleGeneratePosts}
+            disabled={!orgId || generating}
+          >
+            <Sparkles className="mr-2 h-4 w-4" />
+            {generating ? "Generating…" : "Generate Posts"}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSync}
+            disabled={!orgId || syncing}
+          >
+            <RefreshCw className={cn("mr-2 h-4 w-4", syncing && "animate-spin")} />
+            {syncing ? "Syncing…" : "Sync Now"}
+          </Button>
+        </div>
       </div>
 
       {/* Connection Status */}
@@ -143,10 +170,10 @@ export default function ClientGbpPage() {
               <div
                 className={cn(
                   "rounded-full p-2",
-                  MOCK_CONNECTED ? "bg-success/10" : "bg-danger/10"
+                  connected ? "bg-success/10" : "bg-danger/10"
                 )}
               >
-                {MOCK_CONNECTED ? (
+                {connected ? (
                   <CheckCircle2 className="h-5 w-5 text-success" />
                 ) : (
                   <AlertCircle className="h-5 w-5 text-danger" />
@@ -154,46 +181,67 @@ export default function ClientGbpPage() {
               </div>
               <div>
                 <p className="text-sm font-medium text-foreground">
-                  {MOCK_CONNECTED
+                  {connected
                     ? "Google Business Profile Connected"
                     : "Google Business Profile Disconnected"}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Last synced {formatRelativeTime(MOCK_LAST_SYNC)} &middot;
-                  Place ID: {truncate(MOCK_PLACE_ID, 16)}
+                  {lastSync ? `Last synced ${formatRelativeTime(lastSync)}` : "Not synced yet"}
+                  {placeId ? ` · Place ID: ${truncate(placeId, 16)}` : ""}
                 </p>
               </div>
             </div>
-            <StatusBadge status={MOCK_CONNECTED ? "connected" : "disconnected"} />
+            <StatusBadge status={connected ? "connected" : "disconnected"} />
           </div>
         </CardContent>
       </Card>
+
+      {/* Connector health */}
+      {connectorHealth.length > 0 && (
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs font-medium text-muted-foreground mb-2">Data connectors</p>
+            <div className="flex flex-wrap gap-2">
+              {connectorHealth.map((c) => (
+                <Badge
+                  key={c.provider}
+                  variant="outline"
+                  className={cn("text-xs capitalize", healthColor(c.status))}
+                  title={c.message}
+                >
+                  {c.provider.replace("_", " ")} · {c.status}
+                </Badge>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Insights Grid */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard
           label="Search Views"
-          value={MOCK_INSIGHTS.searchViews.toLocaleString()}
+          value={(insights?.search_views ?? 0).toLocaleString()}
           icon={<Eye className="h-5 w-5" />}
         />
         <StatCard
           label="Maps Views"
-          value={MOCK_INSIGHTS.mapsViews.toLocaleString()}
+          value={(insights?.maps_views ?? 0).toLocaleString()}
           icon={<MapPin className="h-5 w-5" />}
         />
         <StatCard
           label="Website Clicks"
-          value={MOCK_INSIGHTS.websiteClicks}
+          value={insights?.website_clicks ?? 0}
           icon={<MousePointerClick className="h-5 w-5" />}
         />
         <StatCard
           label="Calls"
-          value={MOCK_INSIGHTS.calls}
+          value={insights?.calls ?? 0}
           icon={<PhoneCall className="h-5 w-5" />}
         />
         <StatCard
           label="Direction Requests"
-          value={MOCK_INSIGHTS.directionRequests}
+          value={insights?.direction_requests ?? 0}
           icon={<Navigation className="h-5 w-5" />}
         />
       </div>
@@ -332,7 +380,7 @@ export default function ClientGbpPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {MOCK_COMPETITORS.length === 0 ? (
+          {competitors.length === 0 ? (
             <EmptyState
               icon={<Building2 className="h-8 w-8" />}
               title="No competitors tracked"
@@ -340,7 +388,7 @@ export default function ClientGbpPage() {
             />
           ) : (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {MOCK_COMPETITORS.map((comp) => (
+              {competitors.map((comp) => (
                 <div
                   key={comp.id}
                   className="rounded-lg border border-border p-4"
