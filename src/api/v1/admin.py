@@ -9,16 +9,20 @@ Provides the backend for the admin dashboard showing:
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timedelta
 from typing import Any
+from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
 from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.deps import verify_admin_secret
-from src.database import get_db
+from src.core.deps import verify_admin_secret
+from src.core.database import get_db
 from src.models.gbp import GbpInsights, GbpPost, GbpPostStatus
+from src.models.journey import UserJourneyEvent
 from src.models.lead import Lead, LeadSource, LeadStatus
 from src.models.notification import OnboardingEvent
 from src.models.org import OnboardingStatus, Org, PlanTier
@@ -297,41 +301,94 @@ async def admin_org_activity(
 
 @router.get("/funnel")
 async def onboarding_funnel(
+    period_days: int = Query(90, ge=1, le=365),
     db: AsyncSession = Depends(get_db),
 ):
     """Detailed onboarding funnel with conversion rates."""
-    stmt = select(OnboardingEvent).order_by(OnboardingEvent.created_at.desc())
+    from src.application.admin import AdminFacade
+
+    facade = AdminFacade(db)
+    return {"data": await facade.onboarding_funnel(period_days=period_days)}
+
+
+@router.get("/journey-analytics")
+async def journey_analytics(
+    period_days: int = Query(90, ge=1, le=365),
+    db: AsyncSession = Depends(get_db),
+):
+    """Blinkit-style journey metrics, funnel deep dive, and root-cause insights."""
+    from src.application.admin import AdminFacade
+
+    facade = AdminFacade(db)
+    return {"data": await facade.journey_analytics(period_days=period_days)}
+
+
+@router.get("/orgs/{org_id}/journey")
+async def get_org_journey(
+    org_id: str,
+    db: AsyncSession = Depends(get_db),
+    limit: int = 100,
+    offset: int = 0,
+):
+    """Get user journey events for a specific org, grouped by session."""
+    org = await db.get(Org, org_id)
+    if not org:
+        raise HTTPException(status_code=404, detail="Organization not found")
+
+    stmt = (
+        select(UserJourneyEvent)
+        .where(UserJourneyEvent.org_id == org_id)
+        .order_by(UserJourneyEvent.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+    )
     result = await db.execute(stmt)
     events = result.scalars().all()
 
-    # Count by event type
-    event_counts: dict[str, int] = {}
+    sessions: dict[str, list[dict[str, Any]]] = {}
     for event in events:
-        event_counts[event.event_type] = event_counts.get(event.event_type, 0) + 1
-
-    # Calculate conversion rates between steps
-    steps = [
-        "signup",
-        "gbp_connected",
-        "whatsapp_connected",
-        "territory_set",
-        "onboarding_complete",
-        "first_lead",
-    ]
-
-    funnel_data = []
-    for i, step in enumerate(steps):
-        count = event_counts.get(step, 0)
-        prev_count = event_counts.get(steps[i - 1], count) if i > 0 else count
-        conversion = (count / prev_count * 100) if prev_count > 0 else 100
-
-        funnel_data.append({
-            "step": step,
-            "count": count,
-            "conversion_from_previous": round(conversion, 1),
+        if event.session_id not in sessions:
+            sessions[event.session_id] = []
+        sessions[event.session_id].append({
+            "id": event.id,
+            "event_type": event.event_type,
+            "page": event.page,
+            "element": event.element,
+            "description": event.description,
+            "metadata": json.loads(event.metadata_json) if event.metadata_json else {},
+            "created_at": event.created_at.isoformat(),
         })
 
-    return {"data": funnel_data}
+    session_list = [
+        {
+            "session_id": sid,
+            "org_id": org_id,
+            "org_name": org.name,
+            "started_at": events_in_session[-1]["created_at"] if events_in_session else None,
+            "last_activity_at": events_in_session[0]["created_at"] if events_in_session else None,
+            "events": events_in_session,
+            "total_events": len(events_in_session),
+            "pages_visited": list({e["page"] for e in events_in_session if e["page"]}),
+            "errors_count": sum(1 for e in events_in_session if e["event_type"] == "error"),
+            "completed_actions": [
+                e["description"]
+                for e in events_in_session
+                if e["event_type"] in ("form_submit", "onboarding_step", "lead_created")
+            ],
+        }
+        for sid, events_in_session in sessions.items()
+    ]
+    session_list.sort(key=lambda s: s.get("last_activity_at") or "", reverse=True)
+
+    return {"data": session_list}
+
+
+@router.get("/workflows/insights")
+async def workflow_insights(db: AsyncSession = Depends(get_db)):
+    """AI-powered workflow insights for the admin dashboard."""
+    from src.services.admin.workflow_insights import build_workflow_insights
+
+    return {"data": await build_workflow_insights(db)}
 
 
 def calculate_org_health(org: Org, db: AsyncSession) -> dict[str, Any]:
@@ -401,4 +458,151 @@ def calculate_org_health(org: Org, db: AsyncSession) -> dict[str, Any]:
         "max_score": 100,
         "label": label,
         "reasons": reasons,
+    }
+
+
+@router.get("/intelligence")
+async def platform_intelligence(
+    cohort_months: int = Query(6, ge=1, le=24),
+    db: AsyncSession = Depends(get_db),
+):
+    """Cohort analysis and churn prediction across all GlamAI clients."""
+    from src.application.admin import AdminFacade
+
+    facade = AdminFacade(db)
+    return {"data": await facade.platform_intelligence(cohort_months=cohort_months)}
+
+
+@router.get("/pilot-status")
+async def admin_pilot_status(
+    period_days: int = Query(30, ge=1, le=90),
+    db: AsyncSession = Depends(get_db),
+):
+    """Live pilot health per org — GBP, WhatsApp, sync freshness, leads, analysis."""
+    from src.services.admin.pilot_status import PilotStatusService
+
+    service = PilotStatusService(db)
+    return {"data": await service.build_all(period_days=period_days)}
+
+
+class AdminMessageBody(BaseModel):
+    message: str = Field(..., min_length=1, max_length=2000)
+    channel: str = Field(default="whatsapp")
+
+
+@router.post("/orgs/{org_id}/pause")
+async def admin_pause_org(org_id: str, db: AsyncSession = Depends(get_db)):
+    """Pause a client account (admin quick action)."""
+    from src.services.admin.org_actions import pause_org
+
+    return {"data": await pause_org(db, org_id)}
+
+
+@router.post("/orgs/{org_id}/resume")
+async def admin_resume_org(org_id: str, db: AsyncSession = Depends(get_db)):
+    """Resume a paused client account."""
+    from src.services.admin.org_actions import resume_org
+
+    return {"data": await resume_org(db, org_id)}
+
+
+@router.post("/orgs/{org_id}/message")
+async def admin_send_org_message(
+    org_id: str,
+    body: AdminMessageBody,
+    db: AsyncSession = Depends(get_db),
+):
+    """Send WhatsApp (or log) message to client from admin."""
+    from src.services.admin.org_actions import send_org_message
+
+    return {"data": await send_org_message(db, org_id, body.message, channel=body.channel)}
+
+
+def _integration_status(configured: bool, label: str = "configured") -> str:
+    return label if configured else "not_configured"
+
+
+@router.get("/settings")
+async def admin_settings():
+    """Platform configuration overview for the admin settings page (no secrets)."""
+    from src.core.config import get_settings
+
+    s = get_settings()
+    wa_key = s.whatsapp_api_key or s.whatsapp_360dialog_api_key
+
+    return {
+        "data": {
+            "environment": s.app_env,
+            "app_base_url": s.app_base_url,
+            "database": {
+                "url_host": s.database_url.split("@")[-1] if "@" in s.database_url else "local",
+                "pool_size": s.database_pool_size,
+            },
+            "integrations": {
+                "clerk": {
+                    "status": "dashboard_env",
+                    "note": "Configured in dashboard/.env (NEXT_PUBLIC_CLERK_*)",
+                },
+                "google_gbp": {
+                    "status": _integration_status(bool(s.google_client_id and s.google_client_secret)),
+                    "oauth_redirect": s.google_redirect_uri,
+                    "places_api": _integration_status(bool(s.google_places_api_key)),
+                },
+                "whatsapp": {
+                    "status": _integration_status(bool(wa_key)),
+                    "provider": s.whatsapp_provider,
+                    "phone_number_id": bool(s.whatsapp_phone_number_id),
+                },
+                "llm": {
+                    "provider": s.llm_provider,
+                    "status": _integration_status(
+                        s.llm_provider == "ollama" or bool(s.anthropic_api_key)
+                    ),
+                    "model": s.anthropic_model if s.llm_provider == "anthropic" else s.ollama_model,
+                    "ollama_url": s.ollama_base_url if s.llm_provider == "ollama" else None,
+                },
+                "email_resend": {
+                    "status": _integration_status(bool(s.resend_api_key)),
+                    "from_email": s.resend_from_email,
+                },
+                "redis": {
+                    "status": _integration_status(bool(s.redis_url)),
+                    "url": s.redis_url.split("@")[-1] if "@" in s.redis_url else s.redis_url,
+                },
+                "admin_api_secret": {
+                    "status": _integration_status(bool(s.admin_api_secret)),
+                },
+                "encryption_key": {
+                    "status": _integration_status(bool(s.encryption_key)),
+                },
+            },
+            "feature_flags": {
+                "review_engine": s.feature_review_engine,
+                "reengagement": s.feature_reengagement,
+                "content_generator": s.feature_content_generator,
+                "multi_city": s.feature_multi_city,
+                "multi_vertical": s.feature_multi_vertical,
+            },
+            "territory_defaults_km": s.territory_radius_for_category,
+            "pricing_inr": {
+                "starter": s.price_starter_paise / 100,
+                "growth": s.price_growth_paise / 100,
+                "enterprise": s.price_enterprise_paise / 100,
+            },
+            "guarantees": {
+                "gbp_posts_per_month": s.guarantee_gbp_posts_per_month,
+                "whatsapp_response_seconds": s.guarantee_whatsapp_response_seconds,
+                "review_target": s.guarantee_review_target,
+                "review_period_days": s.guarantee_review_period_days,
+                "leads_starter": s.guarantee_leads_target_starter,
+                "leads_growth": s.guarantee_leads_target_growth,
+                "leads_enterprise": s.guarantee_leads_target_enterprise,
+            },
+            "marketing_agent": {
+                "campaign_repeat_sale_days": s.campaign_repeat_sale_days,
+                "campaign_stale_lead_days": s.campaign_stale_lead_days,
+                "review_request_delay_hours": s.review_request_delay_hours,
+            },
+            "note": "Feature flags and pricing are loaded from server .env. Change values there and restart the API.",
+        }
     }

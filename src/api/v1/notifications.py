@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.database import get_db
+from src.core.database import get_db
 from src.models.notification import NotificationLog
 
 router = APIRouter(prefix="/v1/notifications", tags=["Notifications"])

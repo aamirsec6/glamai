@@ -7,7 +7,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from src.database import _async_session_factory
+from src.core.database import _async_session_factory
 from src.models.notification import OnboardingEvent
 from src.models.org import BusinessCategory, OnboardingStatus, Org, PlanTier
 from src.services.territory.checker import TerritoryChecker
@@ -35,6 +35,7 @@ async def onboard(
             address=address,
             city=city,
             state="Karnataka",
+            pincode="560038",
             latitude=latitude,
             longitude=longitude,
             plan=PlanTier.STARTER,

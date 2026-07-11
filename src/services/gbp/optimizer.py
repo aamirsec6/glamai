@@ -12,8 +12,8 @@ from typing import Any
 
 import structlog
 
-from src.connectors.anthropic import AnthropicConnector
-from src.config import get_settings
+from src.integrations.anthropic import AnthropicConnector
+from src.core.config import get_settings
 from src.models.gbp import GbpPost, GbpPostType
 from src.models.org import Org
 

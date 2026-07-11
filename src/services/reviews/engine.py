@@ -9,10 +9,10 @@ import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.config import get_settings
-from src.connectors.base import ConnectorResource
-from src.connectors.registry import ConnectorRegistry
-from src.engine.ingest import IngestEngine
+from src.core.config import get_settings
+from src.integrations.base import ConnectorResource
+from src.integrations.registry import ConnectorRegistry
+from src.analytics.ingest import IngestEngine
 from src.models.lead import Lead, LeadStatus
 from src.models.notification import NotificationChannel, NotificationLog, NotificationType
 from src.models.org import Org

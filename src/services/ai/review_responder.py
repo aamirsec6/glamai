@@ -7,8 +7,8 @@ from typing import Any
 
 import structlog
 
-from src.connectors.base import ConnectorResource
-from src.connectors.anthropic import AnthropicConnector
+from src.integrations.base import ConnectorResource
+from src.integrations.anthropic import AnthropicConnector
 from src.models.org import Org
 
 logger = structlog.get_logger(__name__)

@@ -6,11 +6,16 @@ Main FastAPI application entry point.
 from __future__ import annotations
 
 import structlog
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
-from src.config import get_settings
+from src.core.config import get_settings
 import src.models  # noqa: F401 — register all SQLModel mappers before routes run
+from src.api.v1.agents import router as agents_router
+from src.api.v1.demo import router as demo_router
 from src.api.v1.admin import router as admin_router
 from src.api.v1.campaigns import router as campaigns_router
 from src.api.v1.gbp_reviews import router as gbp_reviews_router
@@ -83,7 +88,16 @@ app.include_router(admin_router, prefix="/api")
 app.include_router(tracking_router, prefix="/api")
 app.include_router(campaigns_router, prefix="/api")
 app.include_router(gbp_reviews_router, prefix="/api")
+app.include_router(agents_router, prefix="/api")
+app.include_router(demo_router, prefix="/api")
 app.include_router(whatsapp_webhook_router, prefix="/api/webhooks")
+
+# ── Local media (GBP post images) ────────────────────────────
+
+_media_root = Path(settings.storage_local_path)
+_media_root.mkdir(parents=True, exist_ok=True)
+(_media_root / "posts").mkdir(parents=True, exist_ok=True)
+app.mount("/media", StaticFiles(directory=str(_media_root)), name="media")
 
 
 # ── Health Check ─────────────────────────────────────────────
@@ -94,7 +108,7 @@ async def health_check():
     import redis.asyncio as aioredis
     from sqlalchemy import text
 
-    from src.database import _engine
+    from src.core.database import _engine
 
     db_ok = False
     redis_ok = False

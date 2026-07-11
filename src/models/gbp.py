@@ -105,7 +105,10 @@ class GbpPost(SQLModel, table=True):
             "org_id": self.org_id,
             "title": self.title,
             "content": self.content[:200] + "..." if self.content and len(self.content) > 200 else self.content,
+            "full_content": self.content,
             "post_type": self.post_type.value,
+            "image_url": self.image_url,
+            "call_to_action": self.call_to_action,
             "status": self.status.value,
             "keyword_target": self.keyword_target,
             "scheduled_at": self.scheduled_at.isoformat() if self.scheduled_at else None,
@@ -113,6 +116,7 @@ class GbpPost(SQLModel, table=True):
             "views": self.views,
             "clicks": self.clicks,
             "ai_generated": self.ai_generated,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
         }
 
 

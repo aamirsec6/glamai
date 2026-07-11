@@ -6,10 +6,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.deps import assert_tenant_access
-from src.config import get_settings
-from src.database import get_db
-from src.facades.marketing import MarketingFacade
+from src.core.deps import assert_tenant_access
+from src.core.config import get_settings
+from src.core.database import get_db
+from src.application.marketing import MarketingFacade
 
 router = APIRouter(prefix="/v1/campaigns", tags=["Marketing Campaigns"])
 

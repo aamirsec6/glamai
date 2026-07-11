@@ -8,7 +8,7 @@ import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.config import get_settings
+from src.core.config import get_settings
 from src.models.integration import IntegrationProvider, OrgIntegration
 from src.services.gbp.client import GbpClient
 from src.utils.encryption import decrypt_value, encrypt_value

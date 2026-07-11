@@ -3,7 +3,7 @@
 import pytest
 from fastapi import HTTPException
 
-from src.api.deps import assert_tenant_access, is_admin_request, require_org_access
+from src.core.deps import assert_tenant_access, is_admin_request, require_org_access
 
 
 def test_require_org_access_allows_same_org():

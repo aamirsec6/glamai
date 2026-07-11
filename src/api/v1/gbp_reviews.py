@@ -6,10 +6,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.deps import assert_tenant_access, require_org_access
-from src.config import get_settings
-from src.database import get_db
-from src.facades.reviews import ReviewsFacade
+from src.core.deps import assert_tenant_access, require_org_access
+from src.core.config import get_settings
+from src.core.database import get_db
+from src.application.reviews import ReviewsFacade
 from src.models.lead import Lead
 
 router = APIRouter(prefix="/v1/gbp-reviews", tags=["Review Engine"])

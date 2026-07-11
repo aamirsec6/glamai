@@ -9,9 +9,9 @@ import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.connectors.anthropic import AnthropicConnector
-from src.connectors.base import ConnectorResource
-from src.connectors.registry import ConnectorRegistry
+from src.integrations.anthropic import AnthropicConnector
+from src.integrations.base import ConnectorResource
+from src.integrations.registry import ConnectorRegistry
 from src.models.gbp import GbpProfileSnapshot
 from src.models.org import Org
 from src.services.gbp.optimizer import INTERIOR_DESIGN_KEYWORDS

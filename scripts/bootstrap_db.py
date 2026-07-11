@@ -6,7 +6,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from src.database import create_all_tables
+from src.core.database import create_all_tables
 
 
 async def main():

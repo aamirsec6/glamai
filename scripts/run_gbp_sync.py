@@ -11,8 +11,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sqlalchemy import select
 
-from src.database import _async_session_factory
-from src.facades.gbp import GbpFacade
+from src.core.database import _async_session_factory
+from src.application.gbp import GbpFacade
 from src.models.org import Org
 
 

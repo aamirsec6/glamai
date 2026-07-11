@@ -1,6 +1,6 @@
 """Analysis engine tests."""
 
-from src.engine.analysis import AnalysisEngine, TenantSnapshot
+from src.analytics.analysis import AnalysisEngine, TenantSnapshot
 
 
 def test_tenant_snapshot_defaults():

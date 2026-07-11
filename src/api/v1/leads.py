@@ -9,8 +9,8 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.deps import assert_tenant_access, require_org_access
-from src.database import get_db
+from src.core.deps import assert_tenant_access, require_org_access
+from src.core.database import get_db
 from src.models.lead import Lead, LeadSource, LeadStatus, WhatsappConversation
 
 router = APIRouter(prefix="/v1/leads", tags=["Leads"])
@@ -179,11 +179,11 @@ async def update_lead(
     await db.refresh(lead)
 
     if lead.status == LeadStatus.WON and not was_won:
-        from src.config import get_settings
+        from src.core.config import get_settings
 
         settings = get_settings()
         if settings.feature_review_engine:
-            from src.tasks.review_tasks import send_review_request
+            from src.workers.review_tasks import send_review_request
 
             send_review_request.delay(body.org_id, lead_id)
 

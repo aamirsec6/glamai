@@ -1,5 +1,13 @@
 # GlamAI Makefile
 
+VENV := .venv
+PY := $(VENV)/bin/python
+CELERY := $(VENV)/bin/celery
+UVICORN := $(VENV)/bin/uvicorn
+PYTEST := $(VENV)/bin/pytest
+RUFF := $(VENV)/bin/ruff
+ALEMBIC := $(VENV)/bin/alembic
+
 .PHONY: help setup dev test lint migrate
 
 help: ## Show this help
@@ -7,53 +15,78 @@ help: ## Show this help
 		awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
 setup: ## Initial project setup
-	python -m venv .venv
-	. .venv/bin/activate && pip install -e ".[dev]"
+	$(PY) -m venv $(VENV)
+	$(VENV)/bin/pip install -e ".[dev]"
 	cp -n .env.example .env
 	@echo "✅ Setup complete. Edit .env with your credentials."
 
 dev: ## Start development server
-	uvicorn src.main:app --reload --port 8000
+	$(UVICORN) src.main:app --reload --port 8000
 
 dev-infra: ## Start infrastructure (postgres + redis)
 	docker compose up -d postgres redis
 
 dev-worker: ## Start Celery worker
-	celery -A src.tasks.celery_app worker --loglevel=info
+	$(CELERY) -A src.workers.celery_app worker --loglevel=info
 
 dev-beat: ## Start Celery beat (scheduler)
-	celery -A src.tasks.celery_app beat --loglevel=info
+	$(CELERY) -A src.workers.celery_app beat --loglevel=info
 
 test: ## Run tests
-	pytest -xvs
+	$(PYTEST) -xvs
 
 test-cov: ## Run tests with coverage
-	pytest --cov=src --cov-report=term-missing
+	$(PYTEST) --cov=src --cov-report=term-missing
 
 lint: ## Run linter
-	ruff check src tests
+	$(RUFF) check src tests
 
 lint-fix: ## Fix lint issues
-	ruff check --fix src tests
+	$(RUFF) check --fix src tests
 
 format: ## Format code
-	ruff format src tests
+	$(RUFF) format src tests
 
 migrate: ## Run database migrations
-	alembic upgrade head
+	$(ALEMBIC) upgrade head
 
 migrate-create: ## Create new migration
 	@read -p "Migration message: " msg; \
-	alembic revision --autogenerate -m "$$msg"
+	$(ALEMBIC) revision --autogenerate -m "$$msg"
 
 bootstrap: ## Bootstrap database (create tables only)
-	python scripts/bootstrap_db.py
+	$(PY) scripts/bootstrap_db.py
 
 gbp-sync: ## Sync GBP data (all orgs)
-	python scripts/run_gbp_sync.py
+	$(PY) scripts/run_gbp_sync.py
 
 gbp-sync-org: ## Sync GBP for one org: make gbp-sync-org ORG_ID=uuid
-	python scripts/run_gbp_sync.py --org-id $(ORG_ID)
+	$(PY) scripts/run_gbp_sync.py --org-id $(ORG_ID)
+
+demo-seed: ## Seed demo account with sample data
+	$(PY) scripts/seed_demo.py
+
+demo-seed-reset: ## Reset and re-seed demo account
+	$(PY) scripts/seed_demo.py --reset
+
+journey-seed: ## Seed ~120 orgs for journey analytics testing
+	$(PY) scripts/seed_journey_bulk.py --count 120
+
+journey-seed-reset: ## Reset and seed large journey analytics dataset
+	$(PY) scripts/seed_journey_bulk.py --count 120 --reset
+
+journey-seed-large: ## Seed 300 orgs for journey analytics stress test
+	$(PY) scripts/seed_journey_bulk.py --count 300 --reset
+
+demo-agents: ## Run all content agents (ORG_ID optional)
+	$(PY) scripts/run_content_agents.py $(if $(ORG_ID),--org-id $(ORG_ID),)
+
+content-agents: ## Alias for demo-agents
+	$(MAKE) demo-agents
+
+demo: ## Bootstrap DB, seed demo, print URLs
+	$(MAKE) bootstrap
+	$(MAKE) demo-seed-reset
 
 
 clean: ## Clean up

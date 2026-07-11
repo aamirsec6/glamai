@@ -6,8 +6,8 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.deps import assert_tenant_access, require_org_access
-from src.database import get_db
+from src.core.deps import assert_tenant_access, require_org_access
+from src.core.database import get_db
 from src.models.report import MonthlyReport
 
 router = APIRouter(prefix="/v1/reports", tags=["Reports"])
@@ -57,12 +57,12 @@ async def generate_report(
     report_year = year or (now.year - 1 if now.month == 1 else now.year)
 
     if async_mode:
-        from src.tasks.report_tasks import generate_report_for_org
+        from src.workers.report_tasks import generate_report_for_org
 
         task = generate_report_for_org.delay(org_id, report_month, report_year)
         return {"message": "Report generation queued", "task_id": task.id}
 
-    from src.facades.analytics import AnalyticsFacade
+    from src.application.analytics import AnalyticsFacade
 
     facade = AnalyticsFacade(db)
     try:

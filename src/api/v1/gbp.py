@@ -10,12 +10,12 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.deps import assert_tenant_access, require_org_access
-from src.config import get_settings
-from src.database import get_db
+from src.core.deps import assert_tenant_access, require_org_access
+from src.core.config import get_settings
+from src.core.database import get_db
 from src.models.gbp import GbpCompetitor, GbpInsights, GbpPost, GbpPostStatus, GbpPostType, GbpRanking
 from src.models.org import Org
-from src.facades.gbp import GbpFacade
+from src.application.gbp import GbpFacade
 from src.services.gbp.client import GbpClient
 from src.services.gbp.token_manager import GbpTokenManager
 from src.services.tenant.audit import log_tenant_event
@@ -43,6 +43,13 @@ class UpdatePostBody(BaseModel):
 class SyncBody(BaseModel):
     org_id: str
     async_mode: bool = Field(default=True, alias="async")
+
+
+class GenerateImagePostBody(BaseModel):
+    org_id: str
+    post_type: str = "portfolio_showcase"
+    keyword_target: str | None = None
+    custom_context: str | None = None
 
 
 @router.get("/posts")
@@ -160,7 +167,7 @@ async def publish_post_now(
     require_org_access(org_id, post.org_id)
 
     if async_mode:
-        from src.tasks.gbp_tasks import publish_post_by_id
+        from src.workers.gbp_tasks import publish_post_by_id
 
         task = publish_post_by_id.delay(post_id)
         return {"message": "Publish queued", "task_id": task.id}
@@ -192,7 +199,7 @@ async def generate_posts(
         raise HTTPException(status_code=404, detail="Organization not found")
 
     if async_mode:
-        from src.tasks.gbp_tasks import generate_posts_for_org
+        from src.workers.gbp_tasks import generate_posts_for_org
 
         task = generate_posts_for_org.delay(org_id)
         return {"message": "Post generation queued", "task_id": task.id}
@@ -202,6 +209,37 @@ async def generate_posts(
         result = await facade.generate_drafts(org_id)
     finally:
         await facade.close()
+    await db.commit()
+    return {"data": result}
+
+
+@router.post("/posts/generate-image")
+async def generate_image_post(
+    body: GenerateImagePostBody,
+    x_org_id: str | None = Header(default=None, alias="X-Org-Id"),
+    x_admin_secret: str | None = Header(default=None, alias="X-Admin-Secret"),
+    db: AsyncSession = Depends(get_db),
+):
+    """Generate one AI image post with caption for GBP."""
+    assert_tenant_access(body.org_id, x_org_id, x_admin_secret)
+    org = await db.get(Org, body.org_id)
+    if not org:
+        raise HTTPException(status_code=404, detail="Organization not found")
+
+    facade = GbpFacade(db)
+    try:
+        result = await facade.generate_image_post(
+            body.org_id,
+            post_type=body.post_type,
+            target_keyword=body.keyword_target,
+            custom_context=body.custom_context,
+        )
+    finally:
+        await facade.close()
+
+    if result.get("status") == "org_not_found":
+        raise HTTPException(status_code=404, detail="Organization not found")
+
     await db.commit()
     return {"data": result}
 
@@ -220,7 +258,7 @@ async def sync_gbp_data(
         raise HTTPException(status_code=404, detail="Organization not found")
 
     if body.async_mode:
-        from src.tasks.gbp_tasks import sync_gbp_for_org
+        from src.workers.gbp_tasks import sync_gbp_for_org
 
         task = sync_gbp_for_org.delay(body.org_id)
         return {"message": "GBP sync queued", "task_id": task.id}

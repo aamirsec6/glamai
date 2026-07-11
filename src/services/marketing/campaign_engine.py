@@ -10,9 +10,9 @@ import structlog
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.config import get_settings
-from src.connectors.registry import ConnectorRegistry
-from src.connectors.base import ConnectorResource
+from src.core.config import get_settings
+from src.integrations.registry import ConnectorRegistry
+from src.integrations.base import ConnectorResource
 from src.models.campaign import (
     CampaignRecipient,
     CampaignStatus,

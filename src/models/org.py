@@ -159,7 +159,7 @@ class Org(SQLModel, table=True):
     @property
     def territory_radius_km(self) -> float:
         """Get the territory radius for this org's category."""
-        from src.config import get_settings
+        from src.core.config import get_settings
 
         settings = get_settings()
         return settings.get_territory_radius(self.category.value)

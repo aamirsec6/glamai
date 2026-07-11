@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.database import get_db
+from src.core.database import get_db
 from src.models.org import Org
 from src.models.territory import KeywordNiche, Territory, TerritoryStatus
 from src.services.territory.checker import TerritoryChecker

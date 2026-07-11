@@ -52,7 +52,7 @@ def test_campaign_type_values():
 
 
 def test_feature_flags_disabled_by_default():
-    from src.config import get_settings
+    from src.core.config import get_settings
 
     s = get_settings()
     assert s.feature_review_engine is False

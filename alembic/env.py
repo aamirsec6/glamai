@@ -13,7 +13,7 @@ from sqlmodel import SQLModel
 
 # Import all models so metadata is populated
 import src.models  # noqa: F401
-from src.config import get_settings
+from src.core.config import get_settings
 
 config = context.config
 if config.config_file_name is not None:

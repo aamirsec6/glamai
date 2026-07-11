@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.database import get_db
+from src.core.database import get_db
 from src.models.member import OrgMember, OrgMemberRole
 
 router = APIRouter(prefix="/v1/members", tags=["Members"])

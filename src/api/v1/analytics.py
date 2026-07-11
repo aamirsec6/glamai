@@ -6,10 +6,10 @@ from fastapi import APIRouter, Depends, Header, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.deps import assert_tenant_access
-from src.database import get_db
-from src.facades.analytics import AnalyticsFacade
-from src.facades.gbp import GbpFacade
+from src.core.deps import assert_tenant_access
+from src.core.database import get_db
+from src.application.analytics import AnalyticsFacade
+from src.application.gbp import GbpFacade
 
 router = APIRouter(prefix="/v1/analytics", tags=["Analytics"])
 
@@ -39,6 +39,27 @@ async def analytics_snapshot(
         await facade.close()
 
 
+@router.get("/insights")
+async def advanced_insights(
+    org_id: str = Query(...),
+    period_days: int = Query(30, ge=1, le=365),
+    include_ai_narrative: bool = Query(False),
+    x_org_id: str | None = Header(default=None, alias="X-Org-Id"),
+    x_admin_secret: str | None = Header(default=None, alias="X-Admin-Secret"),
+    db: AsyncSession = Depends(get_db),
+):
+    """Advanced multi-model business insights — funnel, GBP, competitive, forecast, SEO."""
+    assert_tenant_access(org_id, x_org_id, x_admin_secret)
+    facade = AnalyticsFacade(db)
+    try:
+        data = await facade.get_advanced_insights(
+            org_id, period_days, include_ai_narrative=include_ai_narrative
+        )
+        return {"data": data}
+    finally:
+        await facade.close()
+
+
 @router.post("/sync")
 async def analytics_sync(
     body: TenantSyncBody,
@@ -49,7 +70,7 @@ async def analytics_sync(
     """Pull external data via connectors then return fresh snapshot."""
     assert_tenant_access(body.org_id, x_org_id, x_admin_secret)
     if body.async_mode:
-        from src.tasks.gbp_tasks import sync_gbp_for_org
+        from src.workers.gbp_tasks import sync_gbp_for_org
 
         task = sync_gbp_for_org.delay(body.org_id)
         return {"message": "Sync queued", "task_id": task.id}
@@ -59,8 +80,15 @@ async def analytics_sync(
     try:
         sync_result = await gbp.sync(body.org_id, resources=body.resources)
         snapshot = await analytics.analyze_tenant(body.org_id)
+        insights = await analytics.get_advanced_insights(body.org_id)
         await db.commit()
-        return {"data": {"sync": sync_result, "snapshot": snapshot}}
+        return {
+            "data": {
+                "sync": sync_result,
+                "snapshot": snapshot,
+                "insights": insights,
+            }
+        }
     finally:
         await gbp.close()
         await analytics.close()

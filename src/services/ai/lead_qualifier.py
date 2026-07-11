@@ -23,8 +23,8 @@ import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
-from src.connectors.anthropic import AnthropicConnector
-from src.config import get_settings
+from src.integrations.anthropic import AnthropicConnector
+from src.core.config import get_settings
 from src.models.lead import (
     BudgetRange,
     Lead,

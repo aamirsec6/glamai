@@ -5,9 +5,9 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Header, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.deps import assert_tenant_access
-from src.connectors.registry import ConnectorRegistry
-from src.database import get_db
+from src.core.deps import assert_tenant_access
+from src.integrations.registry import ConnectorRegistry
+from src.core.database import get_db
 
 router = APIRouter(prefix="/v1/integrations", tags=["Integrations"])
 

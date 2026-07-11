@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 from uuid import uuid4
 
@@ -12,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select as sqlmodel_select
 
-from src.database import get_db
+from src.core.database import get_db
 from src.models.lead import Lead, LeadStatus
 from src.models.notification import NotificationLog, OnboardingEvent
 from src.services.tenant.audit import log_tenant_event
@@ -25,7 +25,7 @@ from src.models.org import (
 )
 from src.models.territory import Territory
 from src.services.territory.checker import TerritoryChecker
-from src.api.deps import assert_tenant_access
+from src.core.deps import assert_tenant_access
 
 router = APIRouter(prefix="/v1/orgs", tags=["Organizations"])
 
@@ -267,36 +267,63 @@ async def get_org_dashboard(
     if not org:
         raise HTTPException(status_code=404, detail="Organization not found")
 
-    # Lead summary
+    from dataclasses import asdict
+
+    from src.analytics.analysis import AnalysisEngine
+
+    period_days = 30
+    since = datetime.utcnow() - timedelta(days=period_days)
+
+    # Lead summary (rolling 30-day window for live metrics)
     lead_stmt = (
         select(Lead)
-        .where(Lead.org_id == org_id)
+        .where(Lead.org_id == org_id, Lead.created_at >= since)
         .order_by(Lead.created_at.desc())
         .limit(10)
     )
     lead_result = await db.execute(lead_stmt)
     recent_leads = lead_result.scalars().all()
 
-    lead_count_stmt = select(Lead).where(Lead.org_id == org_id)
-    lead_count_result = await db.execute(lead_count_stmt)
-    all_leads = lead_count_result.scalars().all()
+    period_leads_stmt = select(Lead).where(Lead.org_id == org_id, Lead.created_at >= since)
+    period_leads = (await db.execute(period_leads_stmt)).scalars().all()
 
     leads_by_status = {}
     for status in LeadStatus:
         leads_by_status[status.value] = sum(
-            1 for l in all_leads if l.status == status
+            1 for l in period_leads if l.status == status
         )
+
+    analysis_engine = AnalysisEngine(db)
+    tenant_analysis = await analysis_engine.analyze(org_id, period_days=period_days)
+    snapshot = asdict(tenant_analysis.snapshot)
 
     return {
         "data": {
             "org": org.to_dict(),
             "leads": {
-                "total": len(all_leads),
+                "total": len(period_leads),
+                "period_days": period_days,
                 "by_status": leads_by_status,
                 "recent": [l.to_dict() for l in recent_leads[:5]],
             },
+            "gbp": {
+                "connected": bool(org.gbp_place_id),
+                "last_synced_at": snapshot.get("last_synced_at"),
+                "total_views": snapshot.get("gbp_total_views", 0),
+                "website_clicks": snapshot.get("gbp_website_clicks", 0),
+                "calls": snapshot.get("gbp_calls", 0),
+                "direction_requests": snapshot.get("gbp_direction_requests", 0),
+                "avg_rating": snapshot.get("gbp_avg_rating"),
+                "review_count": snapshot.get("gbp_review_count"),
+            },
+            "analytics": {
+                "scores": tenant_analysis.scores,
+                "trends": tenant_analysis.trends,
+                "recommendations": tenant_analysis.recommendations[:5],
+                "anomalies": tenant_analysis.anomalies[:3],
+            },
             "guarantee": {
-                "leads_generated": org.guarantee_leads_generated,
+                "leads_generated": len(period_leads),
                 "posts_delivered": org.guarantee_gbp_posts_delivered,
                 "reviews_collected": org.guarantee_reviews_collected,
             },

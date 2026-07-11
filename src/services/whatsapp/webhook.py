@@ -17,8 +17,8 @@ import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.config import get_settings
-from src.database import get_db
+from src.core.config import get_settings
+from src.core.database import get_db
 from src.models.integration import WebhookProvider
 from src.models.lead import (
     Lead,
@@ -32,7 +32,7 @@ from src.models.org import OnboardingStatus, Org
 from src.services.ai.lead_qualifier import LeadQualifier
 from src.services.webhook_idempotency import is_webhook_processed, record_webhook_event
 from src.services.whatsapp.templates import get_lead_notification_message
-from src.tasks.notification_tasks import send_lead_notification
+from src.workers.notification_tasks import send_lead_notification
 
 logger = structlog.get_logger(__name__)
 
@@ -310,6 +310,9 @@ class WhatsappWebhookHandler:
         )
         db.add(new_lead)
         await db.flush()
+        from src.services.tenant.milestones import record_first_lead_if_needed
+
+        await record_first_lead_if_needed(db, org_id)
         return new_lead
 
     async def _notify_designer(
@@ -389,7 +392,7 @@ async def receive_webhook(
     """Receive inbound WhatsApp messages via webhook."""
     body = await request.body()
     settings = get_settings()
-    from src.facades.leads import LeadFacade
+    from src.application.leads import LeadFacade
 
     facade = LeadFacade(db)
 
