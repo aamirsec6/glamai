@@ -3,8 +3,17 @@ import { NextResponse, type NextRequest } from "next/server";
 
 const isPublicRoute = createRouteMatcher([
   "/",
+  "/product",
+  "/how-it-works",
+  "/case-studies",
+  "/data",
+  "/pricing",
+  "/contact",
   "/sign-in(.*)",
   "/sign-up(.*)",
+  ...(process.env.NEXT_PUBLIC_DEMO_MODE === "true"
+    ? ["/client(.*)", "/admin(.*)"]
+    : []),
 ]);
 
 const clerkEnabled =

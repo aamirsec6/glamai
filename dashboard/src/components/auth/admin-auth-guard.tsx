@@ -6,11 +6,17 @@ import { useRouter } from "next/navigation";
 import { isClerkEnabled } from "@/lib/auth-config";
 
 export function AdminAuthGuard({ children }: { children: React.ReactNode }) {
+  if (!isClerkEnabled) {
+    return <>{children}</>;
+  }
+  return <ClerkAdminAuthGuard>{children}</ClerkAdminAuthGuard>;
+}
+
+function ClerkAdminAuthGuard({ children }: { children: React.ReactNode }) {
   const { isLoaded, isSignedIn, user } = useUser();
   const router = useRouter();
 
   React.useEffect(() => {
-    if (!isClerkEnabled) return;
     if (!isLoaded) return;
     if (!isSignedIn) {
       router.replace("/sign-in");
@@ -22,7 +28,7 @@ export function AdminAuthGuard({ children }: { children: React.ReactNode }) {
     }
   }, [isLoaded, isSignedIn, user, router]);
 
-  if (isClerkEnabled && (!isLoaded || !isSignedIn)) {
+  if (!isLoaded || !isSignedIn) {
     return null;
   }
 

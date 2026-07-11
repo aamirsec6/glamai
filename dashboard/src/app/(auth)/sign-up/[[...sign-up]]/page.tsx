@@ -4,7 +4,7 @@ import { isClerkEnabled } from "@/lib/auth-config";
 
 export default function SignUpPage() {
   if (!isClerkEnabled) {
-    redirect("/admin");
+    redirect("/client");
   }
 
   return (
