@@ -35,84 +35,25 @@ features:
 ```
 glamai/
 ├── pyproject.toml
-├── .env.example
-├── Dockerfile
-├── docker-compose.yml
-├── Makefile
-├── README.md
-├── docs/
-│   ├── architecture.md
-│   ├── api-reference.md
-│   ├── territory-rules.md
-│   ├── guarantee-framework.md
-│   └── pricing.md
+├── Dockerfile              # Production API image
+├── Dockerfile.dev          # Local docker-compose (hot reload)
+├── dashboard/              # Next.js admin + client portal
+├── deploy/railway/         # Railway deploy guide + env templates
 ├── scripts/
 │   ├── bootstrap_db.py
-│   ├── onboard_client.py
-│   └── run_gbp_sync.py
+│   └── start-api.sh        # Production API entry (schema + uvicorn)
 ├── src/
-│   ├── main.py                  # FastAPI entry point
-│   ├── config.py                # Settings from env
-│   ├── database.py              # DB engine + session
-│   ├── models/
-│   │   ├── __init__.py
-│   │   ├── org.py               # Organization (tenant)
-│   │   ├── lead.py              # Lead + WhatsApp conversations
-│   │   ├── gbp.py               # GBP posts, rankings, competitors
-│   │   ├── report.py            # Monthly value reports
-│   │   ├── territory.py         # Territory/exclusivity records
-│   │   └── notification.py      # Notification log
-│   ├── api/
-│   │   ├── __init__.py
-│   │   ├── deps.py              # Auth + DB dependencies
-│   │   ├── v1/
-│   │   │   ├── __init__.py
-│   │   │   ├── orgs.py          # Organization CRUD
-│   │   │   ├── leads.py         # Lead management
-│   │   │   ├── gbp.py           # GBP operations
-│   │   │   ├── reports.py       # Report generation
-│   │   │   ├── territory.py     # Territory checks
-│   │   │   ├── admin.py         # Admin analytics
-│   │   │   └── webhooks.py      # WhatsApp + GBP webhooks
-│   ├── services/
-│   │   ├── __init__.py
-│   │   ├── whatsapp/
-│   │   │   ├── __init__.py
-│   │   │   ├── client.py        # 360dialog API client
-│   │   │   ├── webhook.py       # Inbound message handler
-│   │   │   └── templates.py     # WhatsApp message templates
-│   │   ├── gbp/
-│   │   │   ├── __init__.py
-│   │   │   ├── client.py        # Google Business Profile API
-│   │   │   ├── optimizer.py     # Post creation + optimization
-│   │   │   └── insights.py      # GBP insights + rank tracking
-│   │   ├── ai/
-│   │   │   ├── __init__.py
-│   │   │   ├── lead_qualifier.py    # Lead qualification flow
-│   │   │   ├── post_generator.py    # GBP post writing
-│   │   │   └── report_narrator.py   # Report narrative generation
-│   │   ├── reports/
-│   │   │   ├── __init__.py
-│   │   │   ├── generator.py     # PDF report generation
-│   │   │   └── scheduler.py     # Monthly report scheduling
-│   │   └── territory/
-│   │       ├── __init__.py
-│   │       ├── checker.py       # Exclusivity conflict detection
-│   │       ├── geocode.py       # Geocoding + distance calc
-│   │       └── keyword_niche.py # Keyword territory mapping
-│   └── tasks/
-│       ├── __init__.py
-│       ├── celery_app.py        # Celery configuration
-│       ├── gbp_tasks.py         # GBP post scheduling
-│       ├── report_tasks.py      # Report generation
-│       └── notification_tasks.py # WhatsApp notifications
-└── tests/
-    ├── conftest.py
-    ├── test_models.py
-    ├── test_api/
-    ├── test_services/
-    └── test_tasks/
+│   ├── main.py
+│   ├── core/               # config, database, deps
+│   ├── application/        # API facades (orchestration)
+│   ├── analytics/          # DB-only insights engine
+│   ├── integrations/       # External API connectors
+│   ├── services/           # Domain logic
+│   ├── workers/            # Celery tasks
+│   └── api/v1/             # Thin HTTP routes
 ```
+
+See [deploy/railway/README.md](deploy/railway/README.md) for production deployment.
 
 ## Quick Start
 

@@ -1,0 +1,8 @@
+# Optional Railway metadata — primary config is set per-service in the Railway UI.
+
+[build]
+builder = "DOCKERFILE"
+
+[deploy]
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3

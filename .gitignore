@@ -9,6 +9,9 @@ __pycache__/
 *.egg-info/
 .venv/
 .pytest_cache/
+celerybeat-schedule
+celerybeat.pid
+.env.*.local
 
 # Node / Next.js
 dashboard/node_modules/
