@@ -6,6 +6,18 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+/** Resolve post image URLs served from the GlamAI API media mount. */
+export function resolveMediaUrl(url?: string | null): string | undefined {
+  if (!url) return undefined;
+  if (url.startsWith("/media/")) return `${API_BASE}${url}`;
+  return url;
+}
+
+export const POST_IMAGE_FALLBACK =
+  "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?w=1080&h=1080&fit=crop";
+
 export function formatCurrency(amount: number): string {
   if (amount >= 100000) {
     return `₹${(amount / 100000).toFixed(1)}L`;

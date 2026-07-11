@@ -1,5 +1,6 @@
 "use client";
 
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import * as React from "react";
 import {
   BarChart,
@@ -13,7 +14,6 @@ import {
   LabelList,
 } from "recharts";
 import type { FunnelStep } from "@/types";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const COLORS = [

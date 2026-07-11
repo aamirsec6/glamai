@@ -8,10 +8,7 @@ interface EmptyStateProps extends React.HTMLAttributes<HTMLDivElement> {
   icon?: React.ReactNode;
   title: string;
   description?: string;
-  action?: {
-    label: string;
-    onClick: () => void;
-  };
+  action?: React.ReactNode | { label: string; onClick: () => void };
 }
 
 const EmptyState = React.forwardRef<HTMLDivElement, EmptyStateProps>(
@@ -34,9 +31,13 @@ const EmptyState = React.forwardRef<HTMLDivElement, EmptyStateProps>(
         <p className="mb-6 max-w-sm text-sm text-muted">{description}</p>
       )}
       {action && (
-        <Button onClick={action.onClick} variant="default">
-          {action.label}
-        </Button>
+        typeof action === "object" && action !== null && "onClick" in action ? (
+          <Button onClick={action.onClick} variant="default">
+            {action.label}
+          </Button>
+        ) : (
+          <div>{action}</div>
+        )
       )}
     </div>
   )

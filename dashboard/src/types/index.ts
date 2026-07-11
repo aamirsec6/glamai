@@ -77,7 +77,10 @@ export interface GbpPost {
   org_id: string;
   title?: string;
   content: string;
+  full_content?: string;
   post_type: string;
+  image_url?: string;
+  call_to_action?: string;
   status: string;
   keyword_target?: string;
   scheduled_at?: string;
@@ -85,7 +88,7 @@ export interface GbpPost {
   views?: number;
   clicks?: number;
   ai_generated: boolean;
-  created_at: string;
+  created_at?: string;
 }
 
 export interface GbpRanking {

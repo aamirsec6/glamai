@@ -1,9 +1,9 @@
 "use client";
 
+import { Card, CardContent } from "@/components/ui/card";
 import Link from "next/link";
 import { useOrgs } from "@/lib/api";
 import { AdminHeader } from "@/components/admin/header";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";

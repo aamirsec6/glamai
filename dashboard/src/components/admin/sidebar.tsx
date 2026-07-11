@@ -10,6 +10,9 @@ import {
   UserPlus,
   Map,
   GitBranch,
+  LineChart,
+  Activity,
+  Route,
   Settings,
   ChevronLeft,
   ChevronRight,
@@ -22,6 +25,9 @@ const navItems = [
   { href: "/admin/onboarding", label: "Onboarding", icon: UserPlus },
   { href: "/admin/territories", label: "Territories", icon: Map },
   { href: "/admin/workflows", label: "Workflows", icon: GitBranch },
+  { href: "/admin/pilot", label: "Live Pilots", icon: Activity },
+  { href: "/admin/journey", label: "Journey Analytics", icon: Route },
+  { href: "/admin/intelligence", label: "Intelligence", icon: LineChart },
   { href: "/admin/settings", label: "Settings", icon: Settings },
 ];
 

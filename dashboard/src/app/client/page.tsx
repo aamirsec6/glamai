@@ -7,9 +7,13 @@ import { useOrgId } from "@/lib/org-context";
 import {
   Card, CardContent, CardHeader, CardTitle, CardDescription,
 } from "@/components/ui/card";
-import {
-  Badge, Skeleton, StatCard, Progress, StatusBadge, EmptyState, Button,
-} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { StatCard } from "@/components/ui/stat-card";
+import { Progress } from "@/components/ui/progress";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { EmptyState } from "@/components/ui/empty-state";
 import { formatCurrency, formatRelativeTime } from "@/lib/utils";
 import type { Lead } from "@/types";
 import {
@@ -54,16 +58,35 @@ export default function ClientDashboardPage() {
       0
     ));
   const { data: analyticsData } = useAnalyticsSnapshot(orgId || "");
-  const analytics = analyticsData?.data as {
+  type AnalyticsPayload = {
+    snapshot?: {
+      gbp_total_views?: number;
+      gbp_website_clicks?: number;
+      gbp_calls?: number;
+      gbp_direction_requests?: number;
+      leads_total?: number;
+      last_synced_at?: string | null;
+      gbp_connected?: boolean;
+    };
     scores?: { overall?: number; lead_generation?: number; gbp_visibility?: number };
     recommendations?: string[];
     anomalies?: string[];
-  } | undefined;
-  const gbpConnected = !!org?.gbp_place_id;
-  const overallScore = analytics?.scores?.overall;
-  const gbpViews = (analytics?.scores?.gbp_visibility ?? 0) > 0
-    ? String(Math.round((analytics?.scores?.gbp_visibility ?? 0) * 10))
-    : "—";
+  };
+  const analytics = analyticsData?.data as AnalyticsPayload | undefined;
+  const snapshot = analytics?.snapshot;
+  const gbpFromDashboard = d?.gbp;
+
+  const gbpConnected = gbpFromDashboard?.connected ?? !!org?.gbp_place_id;
+  const overallScore = d?.analytics?.scores?.overall ?? analytics?.scores?.overall;
+  const gbpViews =
+    gbpFromDashboard?.total_views != null && gbpFromDashboard.total_views > 0
+      ? gbpFromDashboard.total_views.toLocaleString()
+      : snapshot?.gbp_total_views
+        ? snapshot.gbp_total_views.toLocaleString()
+        : "—";
+  const leadsTotal = d?.leads?.total ?? snapshot?.leads_total ?? totalLeads;
+  const lastSynced =
+    gbpFromDashboard?.last_synced_at ?? snapshot?.last_synced_at ?? org?.gbp_last_synced_at;
 
   if (isLoading) {
     return (
@@ -125,7 +148,7 @@ export default function ClientDashboardPage() {
 
       {/* Quick Stats */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Leads This Month" value={totalLeads} icon={<Users className="h-5 w-5" />} />
+        <StatCard label="Leads (30 days)" value={leadsTotal} icon={<Users className="h-5 w-5" />} />
         <StatCard label="Conversion Rate" value={`${conversionRate}%`} icon={<TrendingUp className="h-5 w-5" />} />
         <StatCard label="Revenue" value={formatCurrency(revenue)} icon={<IndianRupee className="h-5 w-5" />} />
         <StatCard label="GBP Views" value={gbpViews} icon={<Eye className="h-5 w-5" />} />
@@ -134,18 +157,23 @@ export default function ClientDashboardPage() {
         )}
       </div>
 
-      {analytics?.recommendations && analytics.recommendations.length > 0 && (
+      {(d?.analytics?.recommendations?.length ?? analytics?.recommendations?.length ?? 0) > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Insights</CardTitle>
-            <CardDescription>From your analysis engine</CardDescription>
+            <CardTitle>Live Insights</CardTitle>
+            <CardDescription>From your connected data — sync GBP and WhatsApp for updates</CardDescription>
           </CardHeader>
           <CardContent>
             <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
-              {analytics.recommendations.slice(0, 3).map((r) => (
+              {(d?.analytics?.recommendations ?? analytics?.recommendations ?? []).slice(0, 3).map((r: string) => (
                 <li key={r}>{r}</li>
               ))}
             </ul>
+            <Link href="/client/insights" className="mt-3 inline-block">
+              <Button variant="outline" size="sm">
+                Full analysis <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </Link>
           </CardContent>
         </Card>
       )}
@@ -200,15 +228,26 @@ export default function ClientDashboardPage() {
                 <div className="flex-1">
                   <p className="text-sm font-medium text-foreground">{gbpConnected ? "Connected" : "Not Connected"}</p>
                   <p className="text-xs text-muted-foreground">
-                    {gbpConnected ? `Last synced ${formatRelativeTime(org?.created_at ?? new Date().toISOString())}` : "Connect your GBP to get started"}
+                    {gbpConnected
+                      ? lastSynced
+                        ? `Last synced ${formatRelativeTime(lastSynced)}`
+                        : "Connected — run sync for live metrics"
+                      : "Connect your GBP to get started"}
                   </p>
                 </div>
                 <Badge variant={gbpConnected ? "success" : "danger"}>{gbpConnected ? "Active" : "Inactive"}</Badge>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                {["Views", "Clicks", "Calls", "Directions"].map((label) => (
+                {[
+                  { label: "Views", value: gbpFromDashboard?.total_views ?? snapshot?.gbp_total_views },
+                  { label: "Clicks", value: gbpFromDashboard?.website_clicks ?? snapshot?.gbp_website_clicks },
+                  { label: "Calls", value: gbpFromDashboard?.calls ?? snapshot?.gbp_calls },
+                  { label: "Directions", value: gbpFromDashboard?.direction_requests ?? snapshot?.gbp_direction_requests },
+                ].map(({ label, value }) => (
                   <div key={label} className="rounded-lg border border-border p-3 text-center">
-                    <p className="text-xl font-bold text-foreground">—</p>
+                    <p className="text-xl font-bold text-foreground">
+                      {value != null && value > 0 ? value.toLocaleString() : "—"}
+                    </p>
                     <p className="text-xs text-muted-foreground">{label}</p>
                   </div>
                 ))}

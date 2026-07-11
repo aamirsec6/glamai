@@ -1,16 +1,16 @@
 "use client";
 
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
+import { StatCard } from "@/components/ui/stat-card";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import * as React from "react";
-import { useOnboardingFunnel, useOrgs, useAdminDashboard } from "@/lib/api";
+import { useOnboardingFunnel, useOrgs, useAdminDashboard, useJourneyAnalytics, type JourneyStageMetric } from "@/lib/api";
 import { AdminHeader } from "@/components/admin/header";
 import { FunnelChart } from "@/components/admin/funnel-chart";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/card";
-import { StatCard } from "@/components/ui/card";
-import { Progress } from "@/components/ui/card";
-import { EmptyState } from "@/components/ui/card";
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/card";
 import { cn, formatRelativeTime, getCategoryLabel } from "@/lib/utils";
 import {
   Users,
@@ -42,15 +42,7 @@ function getStepLabel(step: string): string {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-// ── Drop-off reasons (derived from funnel data) ──
-
-const DROP_OFF_REASONS = [
-  { reason: "GBP profile not verified", count: 12 },
-  { reason: "WhatsApp number not connected", count: 9 },
-  { reason: "Territory not claimed", count: 7 },
-  { reason: "No response after signup", count: 15 },
-  { reason: "Plan selection skipped", count: 5 },
-];
+// ── Drop-off reasons derived from journey analytics ──
 
 // ── Main Page ──
 
@@ -59,7 +51,9 @@ export default function OnboardingAnalyticsPage() {
   const { data: orgsData, isLoading: orgsLoading } = useOrgs();
   const { data: dashboard, isLoading: dashLoading } = useAdminDashboard();
 
-  const isLoading = funnelLoading || orgsLoading || dashLoading;
+  const { data: journeyData, isLoading: journeyLoading } = useJourneyAnalytics();
+
+  const isLoading = funnelLoading || orgsLoading || dashLoading || journeyLoading;
 
   // ── Derived data ──
 
@@ -77,10 +71,10 @@ export default function OnboardingAnalyticsPage() {
   // Completion rate
   const completionRate = totalSignups > 0 ? Math.round((completedOnboarding / totalSignups) * 100) : 0;
 
-  // Avg time to active (from dashboard or fallback)
-  const avgTimeToActive = dash?.onboarding_funnel
-    ? 48 // fallback hours
-    : 48;
+  const journey = journeyData?.data;
+
+  // Avg time to active (from journey analytics)
+  const avgTimeToActive = journey?.summary?.avg_time_to_complete_hours ?? 48;
 
   // ── Drop-off analysis table data ──
   const dropOffData = funnelSteps.map((step, idx) => {
@@ -92,7 +86,9 @@ export default function OnboardingAnalyticsPage() {
       entered: prevCount,
       droppedOff,
       rate,
-      avgTime: formatHours(Math.random() * 24 + 2), // placeholder
+      avgTime: formatHours(
+        journey?.stages?.find((s: JourneyStageMetric) => s.key === step.step)?.median_time_in_stage_hours,
+      ),
     };
   });
 
@@ -116,10 +112,20 @@ export default function OnboardingAnalyticsPage() {
 
   // ── Time-to-complete stats ──
   const timeStats = {
-    avg: "36h",
-    median: "28h",
-    p90: "72h",
+    avg: formatHours(journey?.summary?.avg_time_to_complete_hours),
+    median: formatHours(journey?.summary?.median_time_to_complete_hours),
+    p90: formatHours(journey?.summary?.p90_time_to_complete_hours),
   };
+
+  const dropOffReasons: Array<{ reason: string; count: number }> = (journey?.stages ?? [])
+    .filter((s: JourneyStageMetric) => s.drop_off_count > 0 || s.stuck_count > 0)
+    .flatMap((s: JourneyStageMetric) =>
+      s.observed_friction.length > 0
+        ? s.observed_friction.map((f) => ({ reason: f.label, count: f.count }))
+        : [{ reason: `Stuck at ${s.label}`, count: s.stuck_count || s.drop_off_count }],
+    )
+    .sort((a: { count: number }, b: { count: number }) => b.count - a.count)
+    .slice(0, 5);
 
   // ── Completion rate over time (placeholder data) ──
   const completionTrend = [
@@ -155,7 +161,7 @@ export default function OnboardingAnalyticsPage() {
     <>
       <AdminHeader
         title="Onboarding Analytics"
-        subtitle="Track client onboarding progress"
+        subtitle="Track client onboarding progress — see Journey Analytics for full stage deep dive"
       />
 
       <div className="p-6 space-y-6">
@@ -443,9 +449,11 @@ export default function OnboardingAnalyticsPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {DROP_OFF_REASONS.sort((a, b) => b.count - a.count).map((item, idx) => {
-                  const maxCount = DROP_OFF_REASONS[0].count;
-                  const pct = Math.round((item.count / maxCount) * 100);
+                {(dropOffReasons.length > 0 ? dropOffReasons : [
+                  { reason: "No friction events recorded yet", count: 0 },
+                ]).map((item, idx) => {
+                  const maxCount = dropOffReasons[0]?.count || 1;
+                  const pct = maxCount > 0 ? Math.round((item.count / maxCount) * 100) : 0;
                   return (
                     <div key={item.reason} className="flex items-center gap-4">
                       <span className="text-sm text-muted-foreground w-6 text-right shrink-0">

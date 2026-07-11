@@ -1,9 +1,9 @@
 "use client";
 
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import * as React from "react";
 import { cn, getHealthColor, getHealthBg, getHealthLabel } from "@/lib/utils";
 import type { OrgHealth } from "@/types";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertTriangle, CheckCircle, Info } from "lucide-react";

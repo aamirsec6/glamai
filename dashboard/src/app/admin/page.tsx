@@ -1,13 +1,13 @@
 "use client";
 
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
+import { StatCard } from "@/components/ui/stat-card";
 import * as React from "react";
 import { useAdminDashboard, useOnboardingFunnel } from "@/lib/api";
 import { AdminHeader } from "@/components/admin/header";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/card";
-import { StatCard } from "@/components/ui/card";
-import { Progress } from "@/components/ui/card";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from "recharts";
 import { Users, IndianRupee, TrendingUp, UserCheck, AlertTriangle, Activity } from "lucide-react";
 import { formatCurrency, formatCurrencyFull } from "@/lib/utils";

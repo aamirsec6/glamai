@@ -1,9 +1,9 @@
 "use client";
 
+import { Avatar } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import * as React from "react";
 import { Bell, Search } from "lucide-react";
-import { Avatar } from "@/components/ui/card";
-import { Button } from "@/components/ui/card";
 
 interface AdminHeaderProps {
   title: string;

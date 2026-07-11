@@ -1,5 +1,11 @@
 "use client";
 
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Skeleton } from "@/components/ui/skeleton";
+import { StatCard } from "@/components/ui/stat-card";
+import { StatusBadge } from "@/components/ui/status-badge";
 import * as React from "react";
 import ApiClient, {
   useGbpPosts,
@@ -17,12 +23,6 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/card";
-import { EmptyState } from "@/components/ui/card";
-import { StatCard } from "@/components/ui/card";
-import { Button } from "@/components/ui/card";
-import { StatusBadge } from "@/components/ui/card";
 import { formatRelativeTime, truncate } from "@/lib/utils";
 import type { GbpPost, GbpRanking, GbpCompetitor } from "@/types";
 import {
@@ -43,6 +43,7 @@ import {
   Building2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { PostImage } from "@/components/post-image";
 
 function positionColor(pos?: number) {
   if (!pos) return "text-muted-foreground";
@@ -276,13 +277,19 @@ export default function ClientGbpPage() {
                     key={post.id}
                     className="rounded-lg border border-border p-3"
                   >
+                    {post.image_url && (
+                      <PostImage
+                        src={post.image_url}
+                        className="mb-3 aspect-video w-full rounded-md"
+                      />
+                    )}
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium text-foreground line-clamp-1">
                           {post.title || truncate(post.content, 60)}
                         </p>
                         <p className="mt-1 text-xs text-muted-foreground line-clamp-2">
-                          {post.content}
+                          {post.full_content || post.content}
                         </p>
                       </div>
                       <StatusBadge status={post.status} />
@@ -305,7 +312,9 @@ export default function ClientGbpPage() {
                       <span>
                         {post.published_at
                           ? formatRelativeTime(post.published_at)
-                          : formatRelativeTime(post.created_at)}
+                          : post.created_at
+                            ? formatRelativeTime(post.created_at)
+                            : "—"}
                       </span>
                     </div>
                   </div>

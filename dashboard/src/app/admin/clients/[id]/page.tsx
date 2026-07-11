@@ -62,6 +62,7 @@ import {
   MessageSquare,
   Pause,
   CreditCard,
+  Play,
   ChevronDown,
   AlertTriangle,
   CheckCircle,
@@ -299,9 +300,16 @@ export default function ClientDetailPage() {
   const [leadStatusFilter, setLeadStatusFilter] = React.useState("all");
   const [expandedLeadId, setExpandedLeadId] = React.useState<string | null>(null);
   const [journeyEventFilter, setJourneyEventFilter] = React.useState("all");
+  const [messageOpen, setMessageOpen] = React.useState(false);
+  const [messageText, setMessageText] = React.useState("");
+  const [actionLoading, setActionLoading] = React.useState<string | null>(null);
+  const [actionFeedback, setActionFeedback] = React.useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
 
   // ── Data Fetching ──
-  const { data: orgDetail, isLoading: orgLoading } = useOrgDetail(id);
+  const { data: orgDetail, isLoading: orgLoading, mutate: mutateOrg } = useOrgDetail(id);
   const { data: dashboard, isLoading: dashLoading } = useOrgDashboard(id);
   const {
     data: leadsData,
@@ -366,6 +374,70 @@ export default function ClientDetailPage() {
     mutateLeads();
   };
 
+  const isPaused = org?.onboarding_status === "paused";
+
+  const handlePauseAccount = async () => {
+    if (!org || isPaused) return;
+    if (!window.confirm(`Pause account for ${org.name}? They will stop receiving active services.`)) {
+      return;
+    }
+    setActionLoading("pause");
+    setActionFeedback(null);
+    try {
+      await ApiClient.pauseOrg(id);
+      await mutateOrg();
+      setActionFeedback({ type: "success", text: "Account paused successfully." });
+    } catch (err) {
+      setActionFeedback({
+        type: "error",
+        text: err instanceof Error ? err.message : "Failed to pause account",
+      });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleResumeAccount = async () => {
+    if (!org || !isPaused) return;
+    setActionLoading("resume");
+    setActionFeedback(null);
+    try {
+      await ApiClient.resumeOrg(id);
+      await mutateOrg();
+      setActionFeedback({ type: "success", text: "Account resumed successfully." });
+    } catch (err) {
+      setActionFeedback({
+        type: "error",
+        text: err instanceof Error ? err.message : "Failed to resume account",
+      });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!messageText.trim()) return;
+    setActionLoading("message");
+    setActionFeedback(null);
+    try {
+      const result = await ApiClient.sendOrgMessage(id, messageText.trim());
+      const note = result.data.sent
+        ? `Message sent to ${result.data.recipient} via WhatsApp.`
+        : `Message saved for ${result.data.recipient} (${result.data.delivery_note.replace(/_/g, " ")}).`;
+      setActionFeedback({ type: "success", text: note });
+      setMessageText("");
+      setMessageOpen(false);
+      await mutateOrg();
+    } catch (err) {
+      setActionFeedback({
+        type: "error",
+        text: err instanceof Error ? err.message : "Failed to send message",
+      });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   if (orgLoading && !org) {
     return (
       <div className="p-6">
@@ -403,10 +475,10 @@ export default function ClientDetailPage() {
           </div>
           <div className="flex items-center gap-2">
             <Badge
-              variant={org?.is_active ? "success" : "danger"}
+              variant={isPaused ? "warning" : org?.is_active ? "success" : "danger"}
               className="capitalize"
             >
-              {org?.is_active ? "Active" : "Inactive"}
+              {isPaused ? "Paused" : org?.is_active ? "Active" : "Inactive"}
             </Badge>
             {org?.exclusivity === "exclusive" && (
               <Badge variant="info">
@@ -590,16 +662,63 @@ export default function ClientDetailPage() {
                         </CardDescription>
                       </CardHeader>
                       <CardContent>
+                        {actionFeedback && (
+                          <div
+                            className={cn(
+                              "mb-4 rounded-lg border px-3 py-2 text-sm",
+                              actionFeedback.type === "success"
+                                ? "border-success/30 bg-success/10 text-success"
+                                : "border-danger/30 bg-danger/10 text-danger",
+                            )}
+                          >
+                            {actionFeedback.text}
+                          </div>
+                        )}
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                          <Button variant="outline" className="justify-start">
+                          <Button
+                            variant="outline"
+                            className="justify-start"
+                            onClick={() => setMessageOpen(true)}
+                            disabled={!!actionLoading}
+                          >
                             <MessageSquare className="h-4 w-4 mr-2" />
                             Send Message
                           </Button>
-                          <Button variant="outline" className="justify-start">
-                            <Pause className="h-4 w-4 mr-2" />
-                            Pause Account
-                          </Button>
-                          <Button variant="outline" className="justify-start">
+                          {isPaused ? (
+                            <Button
+                              variant="outline"
+                              className="justify-start"
+                              onClick={handleResumeAccount}
+                              disabled={actionLoading === "resume"}
+                            >
+                              {actionLoading === "resume" ? (
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              ) : (
+                                <Play className="h-4 w-4 mr-2" />
+                              )}
+                              Resume Account
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="outline"
+                              className="justify-start"
+                              onClick={handlePauseAccount}
+                              disabled={actionLoading === "pause"}
+                            >
+                              {actionLoading === "pause" ? (
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              ) : (
+                                <Pause className="h-4 w-4 mr-2" />
+                              )}
+                              Pause Account
+                            </Button>
+                          )}
+                          <Button
+                            variant="outline"
+                            className="justify-start opacity-50"
+                            disabled
+                            title="Coming soon"
+                          >
                             <CreditCard className="h-4 w-4 mr-2" />
                             Change Plan
                           </Button>
@@ -1587,6 +1706,52 @@ export default function ClientDetailPage() {
             </TabsContent>
           </Tabs>
         </div>
+
+      {/* Send message modal */}
+      {messageOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <Card className="w-full max-w-lg shadow-xl">
+            <CardHeader>
+              <CardTitle>Send Message</CardTitle>
+              <CardDescription>
+                WhatsApp to {org?.whatsapp_number || org?.phone || "client"} — from GlamAI admin
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <textarea
+                value={messageText}
+                onChange={(e) => setMessageText(e.target.value)}
+                placeholder="Type your message to the client..."
+                rows={5}
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setMessageOpen(false);
+                    setMessageText("");
+                  }}
+                  disabled={actionLoading === "message"}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleSendMessage}
+                  disabled={!messageText.trim() || actionLoading === "message"}
+                >
+                  {actionLoading === "message" ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <MessageSquare className="h-4 w-4 mr-2" />
+                  )}
+                  Send
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </>
   );
 }

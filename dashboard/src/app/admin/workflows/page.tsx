@@ -1,17 +1,17 @@
 "use client";
 
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Avatar } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Skeleton } from "@/components/ui/skeleton";
+import { StatCard } from "@/components/ui/stat-card";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import * as React from "react";
 import Link from "next/link";
 import { useWorkflowInsights } from "@/lib/api";
 import { AdminHeader } from "@/components/admin/header";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/card";
-import { Button } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/card";
-import { EmptyState } from "@/components/ui/card";
-import { StatCard } from "@/components/ui/card";
-import { Avatar } from "@/components/ui/card";
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/card";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { AlertTriangle, Clock, TrendingDown, Users, Lightbulb, Activity } from "lucide-react";
 import { cn } from "@/lib/utils";

@@ -9,6 +9,7 @@ interface ProgressProps extends React.HTMLAttributes<HTMLDivElement> {
   size?: "sm" | "md" | "lg";
   variant?: "default" | "success" | "warning" | "danger";
   showLabel?: boolean;
+  indicatorClassName?: string;
 }
 
 const sizeClasses = {
@@ -33,6 +34,7 @@ const Progress = React.forwardRef<HTMLDivElement, ProgressProps>(
       variant = "default",
       showLabel = false,
       className,
+      indicatorClassName,
       ...props
     },
     ref
@@ -56,7 +58,7 @@ const Progress = React.forwardRef<HTMLDivElement, ProgressProps>(
           <div
             className={cn(
               "h-full rounded-full transition-all duration-500 ease-out",
-              variantClasses[variant]
+              indicatorClassName ?? variantClasses[variant]
             )}
             style={{ width: `${percentage}%` }}
           />

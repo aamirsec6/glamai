@@ -13,6 +13,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Sparkles,
+  Bot,
 } from "lucide-react";
 import { UserButton } from "@clerk/nextjs";
 import { isClerkEnabled } from "@/lib/auth-config";
@@ -27,6 +28,8 @@ const navItems = [
   { href: "/client", label: "Dashboard", icon: LayoutDashboard },
   { href: "/client/leads", label: "Leads", icon: Users },
   { href: "/client/gbp", label: "GBP", icon: MapPin },
+  { href: "/client/insights", label: "Insights", icon: Sparkles },
+  { href: "/client/ai", label: "AI Studio", icon: Bot },
   { href: "/client/reports", label: "Reports", icon: FileText },
   { href: "/client/settings", label: "Settings", icon: Settings },
 ];
