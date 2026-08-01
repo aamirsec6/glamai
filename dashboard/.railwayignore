@@ -1,2 +1,7 @@
 Dockerfile
 Dockerfile.*
+node_modules
+.next
+.vercel
+.env
+.env*.local
