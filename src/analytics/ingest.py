@@ -67,6 +67,8 @@ class IngestEngine:
                 return await self._ingest_reviews(result)
             if result.resource == ConnectorResource.LOCATIONS:
                 return await self._ingest_profile_from_locations(result)
+            if result.resource == ConnectorResource.POSTS:
+                return await self._ingest_remote_posts(result)
         if result.provider == ConnectorProvider.GOOGLE_PLACES:
             if result.resource == ConnectorResource.COMPETITORS:
                 return await self._ingest_competitors(result)
@@ -335,3 +337,87 @@ class IngestEngine:
         self.session.add(snapshot)
         await self.session.flush()
         return {"status": "ok", "profile_id": snapshot.id}
+
+    async def _ingest_remote_posts(self, result: PullResult) -> dict[str, Any]:
+        """Upsert posts pulled from Google localPosts into gbp_posts."""
+        from uuid import uuid4
+
+        from sqlalchemy import select
+
+        org_id = result.org_id
+        raw_posts = result.data.get("posts") or []
+        created = 0
+        updated = 0
+
+        for raw in raw_posts:
+            google_id = raw.get("name") or ""
+            if not google_id:
+                continue
+
+            summary = raw.get("summary") or raw.get("searchUrl") or ""
+            topic = (raw.get("topicType") or "STANDARD").upper()
+            try:
+                post_type = GbpPostType(topic.lower()) if topic.lower() in {
+                    e.value for e in GbpPostType
+                } else GbpPostType.STANDARD
+            except ValueError:
+                post_type = GbpPostType.STANDARD
+
+            media = raw.get("media") or []
+            image_url = None
+            if media:
+                image_url = media[0].get("googleUrl") or media[0].get("sourceUrl")
+            if isinstance(image_url, str) and len(image_url) > 1000:
+                image_url = image_url[:1000]
+
+            cta = None
+            call_to_action = raw.get("callToAction") or {}
+            if isinstance(call_to_action, dict):
+                cta = _normalize_call_to_action(call_to_action.get("actionType"))
+
+            state = (raw.get("state") or "").upper()
+            status = (
+                GbpPostStatus.PUBLISHED
+                if state in {"LIVE", "PUBLISHED", ""}
+                else GbpPostStatus.DRAFT
+            )
+
+            existing = (
+                await self.session.execute(
+                    select(GbpPost).where(
+                        GbpPost.org_id == org_id,
+                        GbpPost.google_post_id == google_id,
+                    )
+                )
+            ).scalar_one_or_none()
+
+            if existing:
+                existing.content = summary or existing.content
+                existing.post_type = post_type
+                existing.image_url = image_url or existing.image_url
+                existing.call_to_action = cta or existing.call_to_action
+                existing.status = status
+                existing.updated_at = datetime.utcnow()
+                if status == GbpPostStatus.PUBLISHED and not existing.published_at:
+                    existing.published_at = datetime.utcnow()
+                self.session.add(existing)
+                updated += 1
+            else:
+                post = GbpPost(
+                    id=str(uuid4()),
+                    org_id=org_id,
+                    content=summary or "(imported from Google)",
+                    post_type=post_type,
+                    image_url=image_url,
+                    call_to_action=cta,
+                    status=status,
+                    google_post_id=google_id,
+                    ai_generated=False,
+                    published_at=datetime.utcnow() if status == GbpPostStatus.PUBLISHED else None,
+                )
+                self.session.add(post)
+                created += 1
+
+        await self.session.flush()
+        logger.info("ingest_remote_posts", org_id=org_id, created=created, updated=updated)
+        return {"status": "ok", "created": created, "updated": updated}

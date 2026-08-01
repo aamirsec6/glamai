@@ -436,7 +436,7 @@ class GbpFacade:
         resources: list[str] | None = None,
         days: int = 30,
     ) -> dict[str, Any]:
-        resources = resources or ["insights", "competitors", "reviews"]
+        resources = resources or ["insights", "competitors", "reviews", "posts"]
         results: dict[str, Any] = {"org_id": org_id}
 
         # Places-only tenants: refresh from Places instead of GBP OAuth APIs
@@ -482,6 +482,10 @@ class GbpFacade:
             if "reviews" in resources:
                 pull = await gbp.pull(org_id, ConnectorResource.REVIEWS)
                 results["reviews"] = await self.ingest.ingest_pull(pull)
+
+            if "posts" in resources:
+                pull = await gbp.pull(org_id, ConnectorResource.POSTS)
+                results["posts"] = await self.ingest.ingest_pull(pull)
 
             if "competitors" in resources:
                 pull = await places.pull(org_id, ConnectorResource.COMPETITORS)

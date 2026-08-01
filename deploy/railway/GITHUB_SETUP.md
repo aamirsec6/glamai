@@ -39,7 +39,7 @@ After first deploy, set public domains and update:
 External consoles:
 
 - **Google Cloud:** OAuth redirect URI
-- **360dialog/Meta:** `https://<api-domain>/api/webhooks/whatsapp`
+- **360dialog/Meta:** `https://<api-domain>/api/webhooks/whatsapp/`
 - **Clerk:** production dashboard domain
 
 ## 5. Verify

@@ -36,7 +36,7 @@ from src.workers.notification_tasks import send_lead_notification
 
 logger = structlog.get_logger(__name__)
 
-router = APIRouter(prefix="/webhooks/whatsapp", tags=["WhatsApp Webhook"])
+router = APIRouter(prefix="/whatsapp", tags=["WhatsApp Webhook"])
 
 
 class WhatsappWebhookHandler:
@@ -287,15 +287,24 @@ class WhatsappWebhookHandler:
         whatsapp_number: str,
         db: AsyncSession,
     ) -> Org | None:
-        """Find an org by its WhatsApp business number."""
+        """Find an org by its WhatsApp business number (digit-normalized)."""
         from sqlmodel import select
 
-        stmt = select(Org).where(
-            Org.whatsapp_number == whatsapp_number,
-            Org.is_active == True,  # noqa: E712
-        )
+        digits = "".join(c for c in (whatsapp_number or "") if c.isdigit())
+        if not digits:
+            return None
+
+        stmt = select(Org).where(Org.is_active == True)  # noqa: E712
         result = await db.execute(stmt)
-        return result.scalar_one_or_none()
+        orgs = result.scalars().all()
+        for org in orgs:
+            org_digits = "".join(c for c in (org.whatsapp_number or "") if c.isdigit())
+            if not org_digits:
+                continue
+            # Match full or last-10 (India mobile) so +91 vs local storage still works
+            if org_digits == digits or org_digits[-10:] == digits[-10:]:
+                return org
+        return None
 
     async def _handle_campaign_reply(
         self,

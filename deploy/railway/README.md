@@ -7,8 +7,8 @@ Deploy the API, Next.js dashboard, Celery worker, Celery beat, PostgreSQL, and R
 | Service | Root | Dockerfile | Start command |
 |---------|------|------------|---------------|
 | `glamai-api` | `/` | `Dockerfile` | `scripts/start-api.sh` |
-| `glamai-worker` | `/` | `Dockerfile` | `celery -A src.workers.celery_app worker --loglevel=info` |
-| `glamai-beat` | `/` | `Dockerfile` | `celery -A src.workers.celery_app beat --loglevel=info` |
+| `glamai-worker` | `/` | `Dockerfile` | `scripts/start-worker.sh` |
+| `glamai-beat` | `/` | `Dockerfile` | `scripts/start-beat.sh` |
 | `glamai-dashboard` | `/dashboard` | `dashboard/Dockerfile` | default (`next start`) |
 | Postgres | plugin | — | — |
 | Redis | plugin | — | — |
@@ -39,11 +39,11 @@ Deploy the API, Next.js dashboard, Celery worker, Celery beat, PostgreSQL, and R
 Same image as API; only the start command differs:
 
 ```bash
-celery -A src.workers.celery_app worker --loglevel=info
-celery -A src.workers.celery_app beat --loglevel=info
+scripts/start-worker.sh
+scripts/start-beat.sh
 ```
 
-Share all env vars from the API service (reference the API service variables in Railway).
+Share all env vars from the API service (reference the API service variables in Railway). Also set `SERPAPI_KEY` for Map Pack rankings.
 
 ### Dashboard (`glamai-dashboard`)
 
@@ -69,7 +69,7 @@ Generate public domains for API and dashboard. Update:
 | Integration | Action |
 |-------------|--------|
 | **Google Cloud Console** | Add OAuth redirect: `https://<api>/api/v1/gbp/oauth/callback` |
-| **360dialog / Meta** | Webhook: `https://<api>/api/webhooks/whatsapp` |
+| **360dialog / Meta** | Webhook: `https://<api>/api/webhooks/whatsapp/` |
 | **Clerk** | Add production dashboard domain |
 | **Demo data** | Run `make demo-seed-reset` locally against prod DB, or use admin seed (demo routes disabled when `APP_ENV=production`) |
 

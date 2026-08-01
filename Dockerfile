@@ -34,7 +34,7 @@ COPY scripts ./scripts
 COPY alembic.ini ./
 COPY alembic ./alembic
 
-RUN chmod +x scripts/start-api.sh \
+RUN chmod +x scripts/start-api.sh scripts/start-worker.sh scripts/start-beat.sh \
     && mkdir -p /app/media/posts \
     && chown -R glamai:glamai /app
 
