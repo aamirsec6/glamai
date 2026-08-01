@@ -8,15 +8,15 @@ type ButtonSize = "sm" | "md" | "lg";
 
 const buttonVariants: Record<ButtonVariant, string> = {
   default:
-    "bg-primary-500 text-white hover:bg-primary-600 active:bg-primary-700 shadow-sm",
+    "bg-primary text-primary-foreground hover:bg-primary/90 active:bg-primary/80 shadow-sm",
   secondary:
-    "bg-gray-100 text-gray-900 hover:bg-gray-200 active:bg-gray-300",
+    "bg-muted text-foreground hover:bg-muted/80 active:bg-muted/70",
   outline:
-    "border border-gray-300 bg-transparent text-gray-700 hover:bg-gray-50 active:bg-gray-100",
+    "border border-border bg-transparent text-foreground hover:bg-muted active:bg-muted/80",
   ghost:
-    "bg-transparent text-gray-700 hover:bg-gray-100 active:bg-gray-200",
+    "bg-transparent text-foreground hover:bg-muted active:bg-muted/80",
   danger:
-    "bg-danger-500 text-white hover:bg-danger-600 active:bg-danger-700 shadow-sm",
+    "bg-danger text-danger-foreground hover:bg-danger/90 active:bg-danger/80 shadow-sm",
 };
 
 const buttonSizes: Record<ButtonSize, string> = {
@@ -48,8 +48,8 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     <button
       ref={ref}
       className={cn(
-        "inline-flex items-center justify-center rounded-button font-medium transition-colors",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2",
+        "inline-flex items-center justify-center rounded-lg font-medium transition-colors",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         "disabled:pointer-events-none disabled:opacity-50",
         buttonVariants[variant],
         buttonSizes[size],

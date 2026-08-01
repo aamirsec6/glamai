@@ -31,15 +31,15 @@ const dotColors: Record<string, string> = {
 
 const StatusBadge = React.forwardRef<HTMLSpanElement, StatusBadgeProps>(
   ({ status, label, showDot = true, className, ...props }, ref) => {
-    const dotColor = dotColors[status.toLowerCase()] || "bg-gray-400";
+    const dotColor = dotColors[status.toLowerCase()] || "bg-muted-foreground";
     const displayLabel = label || status.charAt(0).toUpperCase() + status.slice(1);
 
     return (
       <span
         ref={ref}
         className={cn(
-          "inline-flex items-center gap-1.5 rounded-badge px-2.5 py-0.5 text-xs font-medium",
-          "bg-gray-50 text-gray-700",
+          "inline-flex items-center gap-1.5 rounded-badge border border-border px-2.5 py-0.5 text-xs font-medium",
+          "bg-muted text-foreground",
           className
         )}
         {...props}

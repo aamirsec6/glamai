@@ -1,7 +1,11 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse, type NextRequest } from "next/server";
 
-const isPublicRoute = createRouteMatcher([
+const clerkEnabled =
+  process.env.NEXT_PUBLIC_DISABLE_CLERK !== "true" &&
+  Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.trim()) &&
+  Boolean(process.env.CLERK_SECRET_KEY?.trim());
+
+const publicPaths = [
   "/",
   "/product",
   "/how-it-works",
@@ -9,28 +13,41 @@ const isPublicRoute = createRouteMatcher([
   "/data",
   "/pricing",
   "/contact",
-  "/sign-in(.*)",
-  "/sign-up(.*)",
-  ...(process.env.NEXT_PUBLIC_DEMO_MODE === "true"
-    ? ["/client(.*)", "/admin(.*)"]
-    : []),
-]);
+  "/qr-code-generator",
+  "/sign-in",
+  "/sign-up",
+];
 
-const clerkEnabled =
-  process.env.NEXT_PUBLIC_DISABLE_CLERK !== "true" &&
-  Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.trim());
+function isPublicPath(pathname: string) {
+  if (process.env.NEXT_PUBLIC_DEMO_MODE === "true") {
+    if (pathname.startsWith("/client") || pathname.startsWith("/admin")) {
+      return true;
+    }
+  }
+  return publicPaths.some(
+    (path) => pathname === path || pathname.startsWith(`${path}/`),
+  );
+}
 
 function passthrough(_request: NextRequest) {
   return NextResponse.next();
 }
 
-const protectedMiddleware = clerkMiddleware(async (auth, request) => {
-  if (!isPublicRoute(request)) {
-    auth().protect();
-  }
-});
+let middlewareHandler: (request: NextRequest) => ReturnType<typeof passthrough>;
 
-export default clerkEnabled ? protectedMiddleware : passthrough;
+if (clerkEnabled) {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { clerkMiddleware } = require("@clerk/nextjs/server");
+  middlewareHandler = clerkMiddleware(async (auth: () => { protect: () => void }, request: NextRequest) => {
+    if (!isPublicPath(request.nextUrl.pathname)) {
+      auth().protect();
+    }
+  });
+} else {
+  middlewareHandler = passthrough;
+}
+
+export default middlewareHandler;
 
 export const config = {
   matcher: [

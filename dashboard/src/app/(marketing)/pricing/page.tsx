@@ -66,31 +66,25 @@ export default function PricingPage() {
               <div
                 key={plan.name}
                 className={cn(
-                  "relative rounded-3xl border p-8 transition-all",
-                  plan.highlight
-                    ? "scale-[1.02] border-[#c9a962]/50 bg-gradient-to-b from-[#c9a962]/15 to-[#0a0a0a] shadow-[0_0_60px_rgba(212,175,55,0.08)]"
-                    : "mkt-card border-white/[0.08]"
+                  "mkt-pricing-card",
+                  plan.highlight && "mkt-pricing-card-highlight",
                 )}
               >
                 {plan.badge && (
-                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-[#d4af37] px-3 py-1 text-xs font-bold text-[#0a0a0a]">
+                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-cyan-400 px-3 py-1 text-xs font-bold text-[#030712]">
                     {plan.badge}
                   </span>
                 )}
-                <p className={cn("text-sm font-semibold", plan.highlight ? "text-[#e8d5a3]" : "text-zinc-500")}>
-                  {plan.name}
-                </p>
+                <p className="text-sm font-semibold text-cyan-400">{plan.name}</p>
                 <p className="mt-4 flex items-baseline gap-1">
                   <span className="text-4xl font-bold text-white">{plan.price}</span>
-                  <span className={plan.highlight ? "text-[#c9a962]" : "text-zinc-500"}>{plan.period}</span>
+                  <span className="text-zinc-500">{plan.period}</span>
                 </p>
-                <p className={cn("mt-2 text-sm", plan.highlight ? "text-zinc-300" : "text-zinc-400")}>
-                  {plan.desc}
-                </p>
+                <p className="mt-2 text-sm text-zinc-400">{plan.desc}</p>
                 <ul className="mt-8 space-y-3">
                   {plan.features.map((f) => (
                     <li key={f} className="flex gap-2 text-sm text-zinc-300">
-                      <Check className={cn("h-4 w-4 shrink-0", plan.highlight ? "text-[#d4af37]" : "text-[#c9a962]")} />
+                      <Check className="h-4 w-4 shrink-0 text-cyan-400" />
                       {f}
                     </li>
                   ))}
@@ -98,10 +92,8 @@ export default function PricingPage() {
                 <Link
                   href={SITE.demoUrl}
                   className={cn(
-                    "mt-8 block rounded-xl py-3 text-center text-sm font-semibold transition-colors",
-                    plan.highlight
-                      ? "mkt-btn-primary"
-                      : "border border-white/10 bg-white/[0.04] text-white hover:border-[#c9a962]/40 hover:bg-white/[0.08]"
+                    "mt-8 block rounded-full py-3 text-center text-sm font-semibold transition-colors",
+                    plan.highlight ? "mkt-btn-primary" : "mkt-btn-secondary",
                   )}
                 >
                   Get started

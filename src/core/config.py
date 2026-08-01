@@ -103,6 +103,11 @@ class Settings(BaseSettings):
     feature_content_generator: bool = True
     feature_multi_city: bool = False
     feature_multi_vertical: bool = False
+    feature_seo_agent: bool = True
+    feature_geo_agent: bool = True
+
+    # ── SEO rank tracking (SerpAPI) ────────────────────────────
+    serpapi_key: str = Field(default="", repr=False)
 
     # ── Marketing Agent ──────────────────────────────────────
     campaign_repeat_sale_days: int = 14

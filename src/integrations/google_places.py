@@ -23,16 +23,14 @@ from src.services.gbp.client import GbpClient
 
 logger = structlog.get_logger(__name__)
 
-CATEGORY_PLACES_TYPES: dict[str, list[str]] = {
-    "interior_design": ["interior_designer"],
-    "architect": ["architect"],
-    "dentist": ["dentist"],
-    "salon": ["beauty_salon", "hair_salon"],
-    "gym": ["gym", "fitness_center"],
-    "photographer": ["photographer"],
-    "restaurant": ["restaurant"],
-    "other": ["establishment"],
-}
+
+def _category_places_types() -> dict[str, list[str]]:
+    from src.services.verticals.registry import all_places_types
+
+    return all_places_types()
+
+
+CATEGORY_PLACES_TYPES: dict[str, list[str]] = _category_places_types()
 
 
 def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:

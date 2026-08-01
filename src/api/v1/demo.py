@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.config import get_settings
 from src.core.database import get_db
 from src.models.org import Org
-from src.services.demo import DEMO_SLUG, seed_demo_account
+from src.services.demo import DEMO_SLUG, delete_demo_account, seed_demo_account
 from src.services.agents import ContentAgentsOrchestrator
 
 
@@ -50,6 +50,17 @@ async def seed_demo(
         "slug": DEMO_SLUG,
         "client_url": f"/client?org={org_id}",
         "ai_url": f"/client/ai?org={org_id}",
+    }
+
+
+@router.delete("/account")
+async def clear_demo_account(db: AsyncSession = Depends(get_db)):
+    """Delete the seeded demo org so you can onboard a real client."""
+    deleted = await delete_demo_account(db)
+    await db.commit()
+    return {
+        "message": "Demo account deleted" if deleted else "No demo account found",
+        "deleted": deleted,
     }
 
 

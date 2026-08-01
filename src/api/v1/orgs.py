@@ -14,7 +14,7 @@ from sqlmodel import select as sqlmodel_select
 
 from src.core.database import get_db
 from src.models.lead import Lead, LeadStatus
-from src.models.notification import NotificationLog, OnboardingEvent
+from src.models.notification import OnboardingEvent
 from src.services.tenant.audit import log_tenant_event
 from src.models.org import (
     BusinessCategory,
@@ -23,8 +23,6 @@ from src.models.org import (
     Org,
     PlanTier,
 )
-from src.models.territory import Territory
-from src.services.territory.checker import TerritoryChecker
 from src.core.deps import assert_tenant_access
 
 router = APIRouter(prefix="/v1/orgs", tags=["Organizations"])
@@ -47,6 +45,8 @@ class OrgCreateSchema(BaseModel):
     website: str | None = None
     plan: PlanTier = PlanTier.STARTER
     exclusivity: ExclusivityTier = ExclusivityTier.STANDARD
+    clerk_user_id: str | None = None
+    clerk_email: str | None = None
 
 
 class OrgUpdateSchema(BaseModel):
@@ -62,6 +62,13 @@ class OrgUpdateSchema(BaseModel):
     longitude: float | None = None
     address: str | None = None
     city: str | None = None
+    state: str | None = None
+    pincode: str | None = None
+
+
+class GeocodeSchema(BaseModel):
+    address: str | None = None
+    save: bool = True
 
 
 _ONBOARDING_ORDER = [
@@ -73,11 +80,14 @@ _ONBOARDING_ORDER = [
     OnboardingStatus.ACTIVE,
 ]
 
+# WhatsApp is optional — may skip whatsapp_connected in the sequence
+_SKIPPABLE = {OnboardingStatus.WHATSAPP_CONNECTED}
+
 
 def _validate_onboarding_transition(
     current: OnboardingStatus, new: OnboardingStatus
 ) -> None:
-    """Prevent skipping onboarding steps."""
+    """Prevent skipping required onboarding steps (WhatsApp is skippable)."""
     if new in (OnboardingStatus.PAUSED, OnboardingStatus.CHURNED):
         return
     try:
@@ -85,11 +95,16 @@ def _validate_onboarding_transition(
         new_idx = _ONBOARDING_ORDER.index(new)
     except ValueError:
         return
-    if new_idx > cur_idx + 1:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Cannot skip onboarding from {current.value} to {new.value}",
-        )
+    if new_idx <= cur_idx + 1:
+        return
+    # Allow jumping over skippable steps only
+    skipped = set(_ONBOARDING_ORDER[cur_idx + 1 : new_idx])
+    if skipped and skipped.issubset(_SKIPPABLE):
+        return
+    raise HTTPException(
+        status_code=400,
+        detail=f"Cannot skip onboarding from {current.value} to {new.value}",
+    )
 
 
 class OrgDetailSchema(BaseModel):
@@ -118,13 +133,6 @@ async def create_org(
     db: AsyncSession = Depends(get_db),
 ):
     """Create a new organization (client onboarding)."""
-    # Check for territory conflicts if location provided
-    if data.category and data.city:
-        checker = TerritoryChecker()
-        # We need lat/lng for conflict check — skip if not available
-        # Conflict check happens during full onboarding
-
-    # Generate slug
     slug = (
         data.name.lower()
         .replace(" ", "-")
@@ -134,7 +142,6 @@ async def create_org(
         + str(uuid4())[:8]
     )
 
-    # Map plan to price
     price_map = {
         PlanTier.FREE: 0,
         PlanTier.STARTER: 199900,
@@ -163,7 +170,6 @@ async def create_org(
     db.add(org)
     await db.flush()
 
-    # Track onboarding event
     event = OnboardingEvent(
         org_id=org.id,
         event_type="signup",
@@ -171,18 +177,76 @@ async def create_org(
     )
     db.add(event)
 
+    member_error: str | None = None
+    if data.clerk_user_id:
+        from src.models.member import OrgMember, OrgMemberRole
+
+        try:
+            existing_m = (
+                await db.execute(
+                    select(OrgMember).where(
+                        OrgMember.clerk_user_id == data.clerk_user_id,
+                        OrgMember.org_id == org.id,
+                    )
+                )
+            ).scalar_one_or_none()
+            if not existing_m:
+                db.add(
+                    OrgMember(
+                        id=str(uuid4()),
+                        clerk_user_id=data.clerk_user_id,
+                        org_id=org.id,
+                        role=OrgMemberRole.OWNER,
+                        email=data.clerk_email or data.email,
+                        created_at=datetime.utcnow(),
+                        updated_at=datetime.utcnow(),
+                    )
+                )
+        except Exception as e:
+            member_error = str(e)
+
     await db.commit()
     await db.refresh(org)
 
-    return {
+    payload: dict[str, Any] = {
         "data": org.to_dict(),
         "message": "Organization created. Continue onboarding.",
         "next_steps": [
             "Connect Google Business Profile",
-            "Connect WhatsApp number",
-            "Set territory/exclusivity",
+            "Confirm location and keywords",
+            "Optionally add WhatsApp",
         ],
     }
+    if member_error:
+        payload["member_link_error"] = member_error
+    return payload
+
+
+@router.get("/mine", response_model=dict)
+async def list_my_orgs(
+    clerk_user_id: str = Query(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """List orgs linked to a Clerk user (multi-tenant switcher)."""
+    from src.models.member import OrgMember
+
+    rows = (
+        await db.execute(select(OrgMember).where(OrgMember.clerk_user_id == clerk_user_id))
+    ).scalars().all()
+    orgs_out = []
+    for m in rows:
+        if not m.org_id:
+            continue
+        org = await db.get(Org, m.org_id)
+        if not org or not org.is_active:
+            continue
+        orgs_out.append(
+            {
+                **org.to_dict(),
+                "role": m.role.value,
+            }
+        )
+    return {"data": orgs_out}
 
 
 @router.get("/{org_id}", response_model=dict)
@@ -199,6 +263,253 @@ async def get_org(
         raise HTTPException(status_code=404, detail="Organization not found")
 
     return {"data": org.to_dict()}
+
+
+@router.post("/{org_id}/geocode", response_model=dict)
+async def geocode_org(
+    org_id: str,
+    body: GeocodeSchema,
+    x_org_id: str | None = Header(default=None, alias="X-Org-Id"),
+    x_admin_secret: str | None = Header(default=None, alias="X-Admin-Secret"),
+    db: AsyncSession = Depends(get_db),
+):
+    """Geocode org address (or provided address) and optionally save lat/lng."""
+    assert_tenant_access(org_id, x_org_id, x_admin_secret)
+    org = await db.get(Org, org_id)
+    if not org:
+        raise HTTPException(status_code=404, detail="Organization not found")
+
+    address = body.address or org.address
+    if not address:
+        raise HTTPException(status_code=400, detail="Address is required to geocode")
+
+    from src.integrations.base import ConnectorResource
+    from src.integrations.google_places import GooglePlacesConnector
+
+    places = GooglePlacesConnector(db)
+    try:
+        result = await places.pull(org_id, ConnectorResource.GEOCODE, address=address)
+    finally:
+        await places.close()
+
+    if not result.ok:
+        raise HTTPException(
+            status_code=502,
+            detail=result.error or "Geocode failed",
+        )
+
+    lat = result.data["latitude"]
+    lng = result.data["longitude"]
+    formatted = result.data.get("formatted_address")
+
+    if body.save:
+        org.latitude = lat
+        org.longitude = lng
+        if formatted:
+            org.address = formatted
+        org.updated_at = datetime.utcnow()
+        db.add(org)
+        await db.commit()
+        await db.refresh(org)
+
+    return {
+        "data": {
+            "latitude": lat,
+            "longitude": lng,
+            "formatted_address": formatted,
+            "saved": body.save,
+        }
+    }
+
+
+@router.get("/{org_id}/setup", response_model=dict)
+async def get_org_setup(
+    org_id: str,
+    x_org_id: str | None = Header(default=None, alias="X-Org-Id"),
+    x_admin_secret: str | None = Header(default=None, alias="X-Admin-Secret"),
+    db: AsyncSession = Depends(get_db),
+):
+    """Setup readiness checklist for client onboarding."""
+    assert_tenant_access(org_id, x_org_id, x_admin_secret)
+    org = await db.get(Org, org_id)
+    if not org:
+        raise HTTPException(status_code=404, detail="Organization not found")
+
+    from src.models.integration import IntegrationProvider, OrgIntegration, OrgSettings
+    from src.models.territory import KeywordNiche, Territory, TerritoryStatus
+
+    territory = (
+        await db.execute(
+            select(Territory).where(
+                Territory.org_id == org_id,
+                Territory.status == TerritoryStatus.ACTIVE,
+            )
+        )
+    ).scalar_one_or_none()
+    niche_count = len(
+        (
+            await db.execute(
+                select(KeywordNiche).where(
+                    KeywordNiche.org_id == org_id,
+                    KeywordNiche.status == TerritoryStatus.ACTIVE,
+                )
+            )
+        ).scalars().all()
+    )
+    settings_row = (
+        await db.execute(select(OrgSettings).where(OrgSettings.org_id == org_id))
+    ).scalar_one_or_none()
+    integration = (
+        await db.execute(
+            select(OrgIntegration).where(
+                OrgIntegration.org_id == org_id,
+                OrgIntegration.provider == IntegrationProvider.GOOGLE_GBP,
+            )
+        )
+    ).scalar_one_or_none()
+
+    business_profile = bool(org.name and org.email and org.phone and org.address and org.category)
+    gbp_connected = bool(org.gbp_place_id and integration)
+    location = org.latitude is not None and org.longitude is not None
+    territory_ok = territory is not None
+    keywords_ok = niche_count > 0
+    whatsapp = bool(org.whatsapp_number)
+    settings_ok = settings_row is not None
+    ready = gbp_connected and location and territory_ok and keywords_ok
+
+    checklist = {
+        "business_profile": {"done": business_profile, "required": True},
+        "gbp_connected": {"done": gbp_connected, "required": True},
+        "location": {"done": location, "required": True},
+        "territory": {"done": territory_ok, "required": True},
+        "keywords": {"done": keywords_ok, "required": True},
+        "whatsapp": {"done": whatsapp, "required": False},
+        "settings": {"done": settings_ok, "required": False},
+    }
+    missing = [k for k, v in checklist.items() if v["required"] and not v["done"]]
+
+    return {
+        "data": {
+            "org_id": org_id,
+            "onboarding_status": org.onboarding_status.value,
+            "is_complete": org.is_fully_onboarded,
+            "ready_for_agents": ready and org.is_fully_onboarded,
+            "checklist": checklist,
+            "missing_required": missing,
+            "keyword_count": niche_count,
+            "next_path": "/client/onboarding" if missing or not org.is_fully_onboarded else None,
+        }
+    }
+
+
+@router.post("/{org_id}/complete-onboarding", response_model=dict)
+async def complete_onboarding(
+    org_id: str,
+    x_org_id: str | None = Header(default=None, alias="X-Org-Id"),
+    x_admin_secret: str | None = Header(default=None, alias="X-Admin-Secret"),
+    db: AsyncSession = Depends(get_db),
+):
+    """Finalize onboarding: OrgSettings, status active, enqueue geo bootstrap."""
+    assert_tenant_access(org_id, x_org_id, x_admin_secret)
+    org = await db.get(Org, org_id)
+    if not org:
+        raise HTTPException(status_code=404, detail="Organization not found")
+
+    from src.models.integration import IntegrationProvider, OrgIntegration, OrgSettings
+    from src.models.territory import KeywordNiche, Territory, TerritoryStatus
+
+    integration = (
+        await db.execute(
+            select(OrgIntegration).where(
+                OrgIntegration.org_id == org_id,
+                OrgIntegration.provider == IntegrationProvider.GOOGLE_GBP,
+            )
+        )
+    ).scalar_one_or_none()
+    if not org.gbp_place_id or not integration:
+        raise HTTPException(status_code=400, detail="Connect Google Business Profile first")
+    if org.latitude is None or org.longitude is None:
+        raise HTTPException(status_code=400, detail="Set location (geocode) first")
+
+    territory = (
+        await db.execute(
+            select(Territory).where(
+                Territory.org_id == org_id,
+                Territory.status == TerritoryStatus.ACTIVE,
+            )
+        )
+    ).scalar_one_or_none()
+    if not territory:
+        raise HTTPException(status_code=400, detail="Claim a territory first")
+
+    niches = (
+        await db.execute(
+            select(KeywordNiche).where(
+                KeywordNiche.org_id == org_id,
+                KeywordNiche.status == TerritoryStatus.ACTIVE,
+            )
+        )
+    ).scalars().all()
+    if not niches:
+        raise HTTPException(status_code=400, detail="Keyword niches required")
+
+    settings_row = (
+        await db.execute(select(OrgSettings).where(OrgSettings.org_id == org_id))
+    ).scalar_one_or_none()
+    if not settings_row:
+        db.add(
+            OrgSettings(
+                org_id=org_id,
+                timezone="Asia/Kolkata",
+                notify_new_leads=True,
+                notify_monthly_reports=True,
+            )
+        )
+
+    # Advance status without illegal jumps (WhatsApp may be skipped)
+    target_sequence = [
+        OnboardingStatus.TERRITORY_SET,
+        OnboardingStatus.ONBOARDING_COMPLETE,
+        OnboardingStatus.ACTIVE,
+    ]
+    for target in target_sequence:
+        try:
+            cur_idx = _ONBOARDING_ORDER.index(org.onboarding_status)
+            tgt_idx = _ONBOARDING_ORDER.index(target)
+        except ValueError:
+            continue
+        if tgt_idx <= cur_idx:
+            continue
+        _validate_onboarding_transition(org.onboarding_status, target)
+        org.onboarding_status = target
+
+    org.onboarding_completed_at = datetime.utcnow()
+    org.updated_at = datetime.utcnow()
+    db.add(org)
+    db.add(
+        OnboardingEvent(
+            org_id=org_id,
+            event_type="onboarding_complete",
+            event_data=json.dumps({"status": org.onboarding_status.value}),
+        )
+    )
+    await db.commit()
+    await db.refresh(org)
+
+    geo_task_id: str | None = None
+    try:
+        from src.workers.geo_tasks import run_geo_agent_for_org
+
+        task = run_geo_agent_for_org.delay(org_id)
+        geo_task_id = task.id
+    except Exception:
+        geo_task_id = None
+
+    return {
+        "data": org.to_dict(),
+        "message": "Onboarding complete",
+        "geo_task_id": geo_task_id,
+    }
 
 
 @router.patch("/{org_id}", response_model=dict)

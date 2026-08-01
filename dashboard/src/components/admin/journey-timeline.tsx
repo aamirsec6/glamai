@@ -108,7 +108,7 @@ export function JourneyTimeline({ events, isLoading }: JourneyTimelineProps) {
     <Card>
       <CardHeader>
         <CardTitle>User Journey Timeline</CardTitle>
-        <p className="text-sm text-muted">
+        <p className="text-sm text-muted-foreground">
           Last {events.length} tracked events
         </p>
       </CardHeader>
@@ -141,14 +141,14 @@ export function JourneyTimeline({ events, isLoading }: JourneyTimelineProps) {
                   {/* Content */}
                   <div className="flex-1 min-w-0 rounded-badge bg-gray-50 px-3 py-2">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm font-medium text-text truncate">
+                      <p className="text-sm font-medium text-foreground truncate">
                         {event.page ?? event.event_type.replace(/_/g, " ")}
                       </p>
-                      <span className="shrink-0 text-xs text-muted">
+                      <span className="shrink-0 text-xs text-muted-foreground">
                         {formatRelativeTime(event.created_at)}
                       </span>
                     </div>
-                    <div className="mt-1 flex items-center gap-3 text-xs text-muted">
+                    <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
                       <span className="capitalize">
                         {event.event_type.replace("_", " ")}
                       </span>
@@ -167,7 +167,7 @@ export function JourneyTimeline({ events, isLoading }: JourneyTimelineProps) {
                             .map(([key, value]) => (
                               <span
                                 key={key}
-                                className="rounded-badge bg-white px-1.5 py-0.5 text-[10px] text-muted border border-gray-200"
+                                className="rounded-badge border border-border bg-card px-1.5 py-0.5 text-[10px] text-muted-foreground"
                               >
                                 {key}: {String(value).slice(0, 20)}
                               </span>

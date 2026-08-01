@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatCurrency, formatRelativeTime } from "@/lib/utils";
+import { ClientPageHeader } from "@/components/client/page-header";
 import {
   TrendingUp,
   Users,
@@ -136,46 +137,45 @@ export default function ClientInsightsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-foreground">Business Insights</h2>
-          <p className="text-sm text-muted-foreground">
-            Live analysis from your GBP data, leads, and competitors.
-          </p>
-          {connected && lastSynced && (
-            <p className="mt-1 text-xs text-muted-foreground">
-              Data last synced {formatRelativeTime(lastSynced)}
-            </p>
-          )}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            size="sm"
-            onClick={handleSyncLive}
-            disabled={syncing || !connected}
-            title={connected ? "Pull latest GBP data and refresh models" : "Connect GBP first"}
-          >
-            {syncing ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <RefreshCw className="mr-2 h-4 w-4" />
-            )}
-            Sync live data
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setWithAi((v) => !v)}
-          >
-            <Sparkles className="mr-2 h-4 w-4" />
-            {withAi ? "AI narrative on" : "AI narrative off"}
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing}>
-            <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-            Refresh
-          </Button>
-        </div>
-      </div>
+      <ClientPageHeader
+        title="Business Insights"
+        description={
+          connected && lastSynced
+            ? `Live analysis from your GBP data, leads, and competitors. Last synced ${formatRelativeTime(lastSynced)}.`
+            : "Live analysis from your GBP data, leads, and competitors."
+        }
+        actions={
+          <>
+            <Button
+              size="sm"
+              onClick={handleSyncLive}
+              disabled={syncing || !connected}
+              className="min-h-11"
+              title={connected ? "Pull latest GBP data and refresh models" : "Connect GBP first"}
+            >
+              {syncing ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="mr-2 h-4 w-4" />
+              )}
+              Sync live data
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setWithAi((v) => !v)}
+              className="min-h-11"
+            >
+              <Sparkles className="mr-2 h-4 w-4" />
+              {withAi ? "AI narrative on" : "AI narrative off"}
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing} className="min-h-11">
+              <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+              Refresh
+            </Button>
+          </>
+        }
+      />
 
       {syncError && (
         <p className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-2 text-sm text-destructive">

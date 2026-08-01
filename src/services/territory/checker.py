@@ -124,6 +124,53 @@ class TerritoryChecker:
 
     # ── Keyword Niche Management ──────────────────────────────
 
+    async def assign_keyword_niches(
+        self,
+        org_id: str,
+        territory_id: str,
+        city: str,
+        category: str,
+        db: AsyncSession,
+        *,
+        exclude_territory_ids: list[str] | None = None,
+        primary_count: int = 4,
+    ) -> list[str]:
+        """Persist keyword niches for an org; optionally avoid competitors' keywords."""
+        taken: set[str] = set()
+        if exclude_territory_ids:
+            stmt = select(KeywordNiche).where(
+                and_(
+                    KeywordNiche.territory_id.in_(exclude_territory_ids),
+                    KeywordNiche.status == TerritoryStatus.ACTIVE,
+                )
+            )
+            existing = (await db.execute(stmt)).scalars().all()
+            taken = {n.keyword for n in existing}
+
+        pool = self._get_keyword_pool(category, city)
+        free = [kw for kw in pool if kw not in taken] or pool
+        assigned = free[: min(primary_count, len(free))]
+
+        for keyword in assigned:
+            db.add(
+                KeywordNiche(
+                    org_id=org_id,
+                    territory_id=territory_id,
+                    keyword=keyword,
+                    is_primary=True,
+                    status=TerritoryStatus.ACTIVE,
+                )
+            )
+
+        logger.info(
+            "keywords_assigned",
+            org_id=org_id,
+            territory_id=territory_id,
+            assigned=assigned,
+            excluded=len(taken),
+        )
+        return assigned
+
     async def partition_keywords(
         self,
         org_id: str,
@@ -132,67 +179,15 @@ class TerritoryChecker:
         category: str,
         db: AsyncSession,
     ) -> list[str]:
-        """Assign keyword niches to a new org within a territory.
-
-        When multiple non-exclusive clients exist in the same area,
-        this partitions the keyword space so each client targets
-        different search terms:
-        - Client A: "best interior designer Bangalore" + "3BHK interior"
-        - Client B: "modular kitchen Bangalore" + "office interior"
-        - Client C: "luxury interior design" + "villa interior"
-
-        Returns list of assigned keywords.
-        """
-        # 1. Find all keyword niches already assigned in this territory
-        stmt = select(KeywordNiche).where(
-            and_(
-                KeywordNiche.territory_id == territory_id,
-                KeywordNiche.status == TerritoryStatus.ACTIVE,
-            )
-        )
-        result = await db.execute(stmt)
-        existing_niches = result.scalars().all()
-
-        assigned_keywords = {n.keyword for n in existing_niches}
-
-        # 2. Get the full keyword pool for this category
-        available_keywords = self._get_keyword_pool(category, city)
-
-        # 3. Filter out already-assigned keywords
-        free_keywords = [kw for kw in available_keywords if kw not in assigned_keywords]
-
-        if not free_keywords:
-            logger.warning(
-                "no_free_keywords",
-                org_id=org_id,
-                territory_id=territory_id,
-            )
-            return []
-
-        # 4. Assign up to 4 primary keywords to the new org
-        # (clients should focus on a few keywords, not spread thin)
-        primary_count = min(4, len(free_keywords))
-        assigned = free_keywords[:primary_count]
-
-        # 5. Save to DB
-        for keyword in assigned:
-            niche = KeywordNiche(
-                org_id=org_id,
-                territory_id=territory_id,
-                keyword=keyword,
-                is_primary=True,
-                status=TerritoryStatus.ACTIVE,
-            )
-            db.add(niche)
-
-        logger.info(
-            "keywords_partitioned",
+        """Assign keyword niches excluding keywords already used on this territory."""
+        return await self.assign_keyword_niches(
             org_id=org_id,
-            assigned=assigned,
-            existing_clients=len(existing_niches),
+            territory_id=territory_id,
+            city=city,
+            category=category,
+            db=db,
+            exclude_territory_ids=[territory_id],
         )
-
-        return assigned
 
     async def get_competitor_niches(
         self,
@@ -268,57 +263,10 @@ class TerritoryChecker:
     @staticmethod
     def _get_keyword_pool(category: str, city: str) -> list[str]:
         """Get the full keyword pool for a category + city."""
-        city_lower = city.lower()
+        from src.services.verticals import get_vertical
 
-        pools = {
-            "interior_design": [
-                f"interior designer in {city_lower}",
-                f"best interior designer {city_lower}",
-                f"interior design company {city_lower}",
-                f"home interior design {city_lower}",
-                f"modular kitchen design {city_lower}",
-                f"wardrobe design {city_lower}",
-                f"3bhk interior design",
-                f"2bhk interior design",
-                f"office interior design {city_lower}",
-                f"home renovation {city_lower}",
-                f"luxury interior design {city_lower}",
-                f"affordable interior designer {city_lower}",
-                f"villa interior design",
-                f"apartment interior design {city_lower}",
-                f"modern interior designer",
-                f"contemporary interior design",
-                f"false ceiling design {city_lower}",
-                f"pooja room design",
-                f"kids room design",
-            ],
-            "dentist": [
-                f"dentist in {city_lower}",
-                f"best dentist {city_lower}",
-                f"dental clinic {city_lower}",
-                f"dental implants {city_lower}",
-                f"root canal treatment {city_lower}",
-                f"braces treatment {city_lower}",
-                f"cosmetic dentistry {city_lower}",
-                f"kids dentist {city_lower}",
-                f"teeth whitening {city_lower}",
-                f"orthodontist {city_lower}",
-            ],
-            "salon": [
-                f"salon in {city_lower}",
-                f"beauty salon {city_lower}",
-                f"hair salon {city_lower}",
-                f"bridal makeup {city_lower}",
-                f"hair spa {city_lower}",
-                f"facial treatment {city_lower}",
-                f"nail salon {city_lower}",
-                f"best salon {city_lower}",
-                f"mens salon {city_lower}",
-                f"salon near me",
-            ],
-        }
-
-        return pools.get(category, [f"business in {city_lower}"])
+        vertical = get_vertical(category)
+        return vertical.keyword_pool(city)
 
 
 from datetime import datetime  # noqa: E402 — needed for release_territory

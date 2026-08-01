@@ -18,6 +18,7 @@ import {
   ChevronRight,
   Sparkles,
 } from "lucide-react";
+import { ThemeToggle } from "@/components/client/theme-toggle";
 
 const navItems = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard },
@@ -50,12 +51,15 @@ export function AdminSidebar() {
             <span className="text-lg font-bold text-foreground">GlamAI</span>
           </Link>
         )}
-        <button
+        <div className="flex items-center gap-1">
+          {collapsed && <ThemeToggle />}
+          <button
           onClick={() => setCollapsed(!collapsed)}
           className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
         >
           {collapsed ? <ChevronRight className="h-5 w-5" /> : <ChevronLeft className="h-5 w-5" />}
         </button>
+        </div>
       </div>
 
       {/* Nav */}
@@ -69,7 +73,7 @@ export function AdminSidebar() {
               className={cn(
                 "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
                 isActive
-                  ? "bg-primary-50 text-primary"
+                  ? "bg-primary/10 text-primary"
                   : "text-muted-foreground hover:bg-muted hover:text-foreground"
               )}
             >
@@ -82,7 +86,8 @@ export function AdminSidebar() {
 
       {/* Footer */}
       {!collapsed && (
-        <div className="border-t border-border p-4">
+        <div className="border-t border-border p-4 space-y-3">
+          <ThemeToggle className="w-full" />
           <p className="text-xs text-muted-foreground">GlamAI v0.1.0</p>
         </div>
       )}

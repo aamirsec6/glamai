@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useUser } from "@clerk/nextjs";
@@ -16,39 +15,24 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import {
-  MapPin,
   CheckCircle2,
   ArrowRight,
   ArrowLeft,
   AlertCircle,
   Loader2,
-  Sparkles,
   Phone,
   MapIcon,
   PartyPopper,
   Building2,
+  MapPin,
 } from "lucide-react";
-
-// ── Types ──
-
-interface FormData {
-  gbpConnected: boolean;
-  gbpPlaceId: string;
-  whatsappPhone: string;
-  whatsappConnected: boolean;
-  territoryAddress: string;
-  territoryCategory: string;
-  territoryRadius: number;
-  territoryConflict: boolean;
-}
 
 const STEPS = [
   { label: "Connect GBP", shortLabel: "GBP" },
-  { label: "Connect WhatsApp", shortLabel: "WhatsApp" },
-  { label: "Set Territory", shortLabel: "Territory" },
+  { label: "Location & keywords", shortLabel: "Location" },
+  { label: "WhatsApp (optional)", shortLabel: "WhatsApp" },
   { label: "Complete", shortLabel: "Done" },
 ];
 
@@ -60,10 +44,18 @@ const CATEGORIES = [
   { value: "architect", label: "Architect" },
   { value: "photographer", label: "Photographer" },
   { value: "restaurant", label: "Restaurant" },
+  { value: "bakery", label: "Bakery" },
   { value: "other", label: "Other" },
 ];
 
-// ── Business signup (required before GBP OAuth) ──
+type GbpLocation = {
+  name: string;
+  title?: string;
+  store_code?: string;
+};
+
+const inputClass =
+  "h-10 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary";
 
 function BusinessSignupForm({
   onCreated,
@@ -74,50 +66,52 @@ function BusinessSignupForm({
 }) {
   const { setOrgId } = useOrgId();
   const [name, setName] = React.useState("");
-  const [email, setEmail] = React.useState("");
+  const [email, setEmail] = React.useState(
+    clerkUser?.primaryEmailAddress?.emailAddress ?? "",
+  );
   const [phone, setPhone] = React.useState("");
   const [address, setAddress] = React.useState("");
   const [city, setCity] = React.useState("Bangalore");
-  const [category, setCategory] = React.useState("interior_design");
+  const [state, setState] = React.useState("Karnataka");
+  const [pincode, setPincode] = React.useState("");
+  const [website, setWebsite] = React.useState("");
+      const [category, setCategory] = React.useState("bakery");
   const [submitting, setSubmitting] = React.useState(false);
   const [error, setError] = React.useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !email.trim() || !phone.trim()) {
-      setError("Business name, email, and phone are required");
+    if (!name.trim() || !email.trim() || !phone.trim() || !address.trim()) {
+      setError("Business name, email, phone, and address are required");
       return;
     }
     setSubmitting(true);
     setError("");
     try {
-      const res = await ApiClient.createOrg({
+      const payload: Record<string, unknown> = {
         name: name.trim(),
         email: email.trim(),
         phone: phone.replace(/\D/g, ""),
-        address: address.trim() || `${city}, India`,
-        city,
+        address: address.trim(),
+        city: city.trim() || "Bangalore",
+        state: state.trim() || "Karnataka",
+        pincode: pincode.trim(),
+        website: website.trim() || undefined,
         category,
-      } as never);
-      if (!res?.data?.id) {
-        throw new Error("Failed to create organization");
-      }
+      };
       if (clerkUser) {
-        try {
-          await ApiClient.createMember({
-            clerk_user_id: clerkUser.id,
-            org_id: res.data.id,
-            role: "owner",
-            email: clerkUser.primaryEmailAddress?.emailAddress ?? undefined,
-          });
-        } catch {
-          // Org created; member link can be retried later
-        }
+        payload.clerk_user_id = clerkUser.id;
+        payload.clerk_email = clerkUser.primaryEmailAddress?.emailAddress ?? email.trim();
+      }
+      const res = await ApiClient.createOrg(payload as never);
+      if (!res?.data?.id) throw new Error("Failed to create organization");
+      if (res.member_link_error) {
+        console.warn("member_link_error", res.member_link_error);
       }
       setOrgId(res.data.id);
       onCreated(res.data.id);
-    } catch {
-      setError("Could not create your business account. Check the API is running.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not create your business account.");
     } finally {
       setSubmitting(false);
     }
@@ -128,92 +122,56 @@ function BusinessSignupForm({
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Building2 className="h-5 w-5 text-primary" />
-          Create Your Business Account
+          Create your business
         </CardTitle>
         <CardDescription>
-          Tell us about your business first, then connect Google Business Profile.
+          We use this profile for local SEO, rankings, and your Google Business connection.
         </CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-foreground">
-              Business Name
-            </label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Studio Interiors"
-              className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-              required
-            />
+            <label className="mb-1.5 block text-sm font-medium">Business name</label>
+            <input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} required />
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-foreground">
-                Email
-              </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@business.com"
-                className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                required
-              />
+              <label className="mb-1.5 block text-sm font-medium">Email</label>
+              <input type="email" className={inputClass} value={email} onChange={(e) => setEmail(e.target.value)} required />
             </div>
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-foreground">
-                Phone
-              </label>
-              <input
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="+91 98765 43210"
-                className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                required
-              />
+              <label className="mb-1.5 block text-sm font-medium">Phone</label>
+              <input type="tel" className={inputClass} value={phone} onChange={(e) => setPhone(e.target.value)} required />
             </div>
           </div>
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-foreground">
-              Business Address
-            </label>
-            <input
-              type="text"
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              placeholder="123 MG Road, Bangalore"
-              className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-            />
+            <label className="mb-1.5 block text-sm font-medium">Business address</label>
+            <input className={inputClass} value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Street, area, landmark" required />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div>
+              <label className="mb-1.5 block text-sm font-medium">City</label>
+              <input className={inputClass} value={city} onChange={(e) => setCity(e.target.value)} />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium">State</label>
+              <input className={inputClass} value={state} onChange={(e) => setState(e.target.value)} />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium">PIN code</label>
+              <input className={inputClass} value={pincode} onChange={(e) => setPincode(e.target.value)} />
+            </div>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-foreground">
-                City
-              </label>
-              <input
-                type="text"
-                value={city}
-                onChange={(e) => setCity(e.target.value)}
-                className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-              />
+              <label className="mb-1.5 block text-sm font-medium">Website (optional)</label>
+              <input className={inputClass} value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://" />
             </div>
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-foreground">
-                Category
-              </label>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-              >
+              <label className="mb-1.5 block text-sm font-medium">Category</label>
+              <select className={inputClass} value={category} onChange={(e) => setCategory(e.target.value)}>
                 {CATEGORIES.map((cat) => (
-                  <option key={cat.value} value={cat.value}>
-                    {cat.label}
-                  </option>
+                  <option key={cat.value} value={cat.value}>{cat.label}</option>
                 ))}
               </select>
             </div>
@@ -226,15 +184,9 @@ function BusinessSignupForm({
           )}
           <Button type="submit" className="w-full" disabled={submitting}>
             {submitting ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Creating account...
-              </>
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Creating…</>
             ) : (
-              <>
-                Continue to GBP Setup
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </>
+              <>Continue to Google Business <ArrowRight className="ml-2 h-4 w-4" /></>
             )}
           </Button>
         </form>
@@ -243,53 +195,129 @@ function BusinessSignupForm({
   );
 }
 
-function BusinessSignupWithClerk({
-  onCreated,
-}: {
-  onCreated: (orgId: string) => void;
-}) {
+function BusinessSignupWithClerk({ onCreated }: { onCreated: (orgId: string) => void }) {
   const { user } = useUser();
-  return <BusinessSignupForm onCreated={onCreated} clerkUser={user ?? null} />;
+  return (
+    <BusinessSignupForm
+      onCreated={onCreated}
+      clerkUser={user ? { id: user.id, primaryEmailAddress: user.primaryEmailAddress } : null}
+    />
+  );
 }
 
-function BusinessSignup({
-  onCreated,
-}: {
-  onCreated: (orgId: string) => void;
-}) {
-  if (isClerkEnabled) {
-    return <BusinessSignupWithClerk onCreated={onCreated} />;
-  }
-  return <BusinessSignupForm onCreated={onCreated} clerkUser={null} />;
-}
-
-// ── Step 1: Connect Google Business Profile ──
-
-function Step1Gbp({
-  formData,
-  setFormData,
-  onNext,
+function StepGbp({
   orgId,
+  onNext,
 }: {
-  formData: FormData;
-  setFormData: React.Dispatch<React.SetStateAction<FormData>>;
-  onNext: () => void;
   orgId: string;
+  onNext: () => void;
 }) {
-  const [connecting, setConnecting] = React.useState(false);
+  const [connected, setConnected] = React.useState(false);
+  const [gbpName, setGbpName] = React.useState<string | null>(null);
+  const [linkSource, setLinkSource] = React.useState<string | null>(null);
+  const [locations, setLocations] = React.useState<GbpLocation[]>([]);
+  const [selected, setSelected] = React.useState<string | null>(null);
+  const [loading, setLoading] = React.useState(true);
+  const [selecting, setSelecting] = React.useState(false);
   const [error, setError] = React.useState("");
+  const [searchQuery, setSearchQuery] = React.useState("");
+  const [searching, setSearching] = React.useState(false);
+  const [hits, setHits] = React.useState<
+    Array<{
+      place_id: string;
+      name: string;
+      address?: string;
+      rating?: number;
+      review_count?: number;
+    }>
+  >([]);
+  const [linkingId, setLinkingId] = React.useState<string | null>(null);
 
-  const handleConnect = () => {
-    if (!orgId) {
-      setError("Create your business account first (above), then connect GBP.");
-      return;
-    }
+  const refresh = React.useCallback(async () => {
+    setLoading(true);
     setError("");
-    setConnecting(true);
-    window.location.href = ApiClient.getGbpOAuthUrl(orgId);
+    try {
+      const conn = await ApiClient.getGbpConnection(orgId);
+      setConnected(!!conn.data?.connected);
+      setGbpName(conn.data?.gbp_name ?? null);
+      setLinkSource(conn.data?.link_source ?? null);
+      if (conn.data?.connected) {
+        try {
+          const locs = await ApiClient.getGbpLocations(orgId);
+          setLocations(locs.data?.locations ?? []);
+          setSelected(locs.data?.selected ?? conn.data.place_id);
+        } catch {
+          setLocations([]);
+        }
+      }
+    } catch {
+      setError("Could not load GBP connection status");
+    } finally {
+      setLoading(false);
+    }
+  }, [orgId]);
+
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("gbp") === "connected") {
+      window.history.replaceState({}, "", "/client/onboarding");
+    }
+    void refresh();
+    void (async () => {
+      try {
+        const { data } = await ApiClient.getOrg(orgId);
+        if (data?.name) setSearchQuery(`${data.name} ${data.city || ""}`.trim());
+      } catch {
+        /* ignore */
+      }
+    })();
+  }, [refresh, orgId]);
+
+  const handleSelect = async (name: string) => {
+    setSelecting(true);
+    setError("");
+    try {
+      await ApiClient.selectGbpLocation(orgId, name);
+      setSelected(name);
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to select location");
+    } finally {
+      setSelecting(false);
+    }
   };
 
-  const canProceed = formData.gbpConnected;
+  const handleSearch = async () => {
+    setSearching(true);
+    setError("");
+    try {
+      const res = await ApiClient.searchGbpPlaces(orgId, searchQuery.trim() || undefined);
+      setHits(res.data?.results ?? []);
+      if (!(res.data?.results?.length)) {
+        setError("No businesses found — try a more specific name + area");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Places search failed");
+      setHits([]);
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const handleLinkPlace = async (placeId: string) => {
+    setLinkingId(placeId);
+    setError("");
+    try {
+      const res = await ApiClient.linkGbpPlace(orgId, placeId);
+      setHits([]);
+      setGbpName(res.data?.gbp_name ?? null);
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to link business");
+    } finally {
+      setLinkingId(null);
+    }
+  };
 
   return (
     <Card>
@@ -299,254 +327,135 @@ function Step1Gbp({
           Connect Google Business Profile
         </CardTitle>
         <CardDescription>
-          Link your Google Business Profile to enable local search visibility,
-          posts, and insights.
+          The business owner signs in with Google so Qimma agents can post, reply to reviews, and
+          sync their live profile — not a shared/demo account.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="rounded-lg border border-border bg-muted/30 p-4">
-          <h4 className="text-sm font-medium text-foreground mb-2">
-            What you&apos;ll get:
-          </h4>
-          <ul className="space-y-2 text-sm text-muted-foreground">
-            <li className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-success shrink-0" />
-              AI-powered Google Business Posts
-            </li>
-            <li className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-success shrink-0" />
-              Keyword ranking tracking
-            </li>
-            <li className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-success shrink-0" />
-              Views, clicks &amp; call analytics
-            </li>
-            <li className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-success shrink-0" />
-              Competitor insights
-            </li>
-          </ul>
-        </div>
-
-        {formData.gbpConnected ? (
-          <div className="flex items-center gap-3 rounded-lg border border-success/20 bg-success/5 p-4">
-            <CheckCircle2 className="h-5 w-5 text-success" />
-            <div>
-              <p className="text-sm font-medium text-success">
-                Google Business Profile Connected!
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Place ID: {formData.gbpPlaceId}
+        {loading ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" /> Checking connection…
+          </div>
+        ) : connected ? (
+          <div className="space-y-3 rounded-lg border border-success/20 bg-success/5 p-4">
+            <div className="flex items-center gap-2 text-success">
+              <CheckCircle2 className="h-5 w-5" />
+              <p className="text-sm font-medium">
+                {linkSource === "oauth" ? "Owner connected" : "Linked"}
+                {gbpName ? ` — ${gbpName}` : ""}
+                {linkSource === "places" ? " (Maps only — owner Google login still recommended)" : ""}
               </p>
             </div>
+            {linkSource === "places" && (
+              <Button
+                size="sm"
+                onClick={() => {
+                  window.location.href = ApiClient.getGbpOAuthUrl(orgId);
+                }}
+              >
+                Upgrade: sign in as owner
+              </Button>
+            )}
+            {locations.length > 1 && (
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">Multiple locations found — pick the right one:</p>
+                {locations.map((loc) => (
+                  <button
+                    key={loc.name}
+                    type="button"
+                    disabled={selecting}
+                    onClick={() => void handleSelect(loc.name)}
+                    className={cn(
+                      "flex w-full items-center justify-between rounded-md border px-3 py-2 text-left text-sm",
+                      selected === loc.name
+                        ? "border-primary bg-primary/5"
+                        : "border-border hover:bg-muted/50",
+                    )}
+                  >
+                    <span>{loc.title || loc.name}</span>
+                    {selected === loc.name && <CheckCircle2 className="h-4 w-4 text-primary" />}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         ) : (
-          <>
-          {error && (
-            <div className="flex items-center gap-2 text-sm text-danger">
-              <AlertCircle className="h-4 w-4 shrink-0" />
-              {error}
-            </div>
-          )}
-          <Button
-            className="w-full"
-            onClick={handleConnect}
-            disabled={connecting || !orgId}
-          >
-            {connecting ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Connecting...
-              </>
-            ) : (
-              <>
-                <MapPin className="mr-2 h-4 w-4" />
-                Connect GBP
-              </>
-            )}
-          </Button>
-          </>
-        )}
-
-        <div className="flex justify-end">
-          <Button
-            variant={canProceed ? "default" : "outline"}
-            size="sm"
-            onClick={onNext}
-            disabled={!canProceed}
-          >
-            Next
-            <ArrowRight className="ml-2 h-4 w-4" />
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-// ── Step 2: Connect WhatsApp ──
-
-function Step2WhatsApp({
-  formData,
-  setFormData,
-  onNext,
-  onBack,
-  orgId,
-}: {
-  formData: FormData;
-  setFormData: React.Dispatch<React.SetStateAction<FormData>>;
-  onNext: () => void;
-  onBack: () => void;
-  orgId: string;
-}) {
-  const [code, setCode] = React.useState("");
-  const [sentCode, setSentCode] = React.useState(false);
-  const [verifying, setVerifying] = React.useState(false);
-  const [error, setError] = React.useState("");
-
-  const handleSendCode = () => {
-    const phone = formData.whatsappPhone;
-    if (phone.length < 10) {
-      setError("Please enter a valid phone number (min 10 digits)");
-      return;
-    }
-    setError("");
-    setSentCode(true);
-  };
-
-  const handleVerify = async () => {
-    if (code.length < 4) {
-      setError("Please enter the verification code");
-      return;
-    }
-    if (!orgId) {
-      setError("Organization not found — complete business signup first");
-      return;
-    }
-    setVerifying(true);
-    setError("");
-    try {
-      await ApiClient.updateOrg(orgId, {
-        whatsapp_number: formData.whatsappPhone.replace(/\D/g, ""),
-        whatsapp_verified: true,
-        onboarding_status: "whatsapp_connected",
-      } as never);
-      setFormData((prev) => ({ ...prev, whatsappConnected: true }));
-    } catch {
-      setError("Failed to save WhatsApp number");
-    } finally {
-      setVerifying(false);
-    }
-  };
-
-  const canProceed = formData.whatsappConnected;
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Phone className="h-5 w-5 text-primary" />
-          Connect WhatsApp
-        </CardTitle>
-        <CardDescription>
-          Receive leads and respond to customers via WhatsApp.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-foreground">
-            WhatsApp Phone Number
-          </label>
-          <div className="flex gap-2">
-            <input
-              type="tel"
-              value={formData.whatsappPhone}
-              onChange={(e) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  whatsappPhone: e.target.value,
-                }))
-              }
-              placeholder="+91 98765 43210"
-              className="h-10 flex-1 rounded-md border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-              disabled={sentCode}
-            />
-            <Button
-              variant="outline"
-              onClick={handleSendCode}
-              disabled={sentCode || formData.whatsappPhone.length < 10}
-            >
-              {sentCode ? "Sent" : "Send Code"}
-            </Button>
-          </div>
-        </div>
-
-        {sentCode && (
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-foreground">
-              Verification Code
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                placeholder="Enter 6-digit code"
-                className="h-10 flex-1 rounded-md border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                maxLength={6}
-              />
+          <div className="space-y-4">
+            <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4">
+              <p className="text-sm font-medium text-foreground">Owner Google login</p>
+              <p className="text-sm text-muted-foreground">
+                Have your friend use the Google account that manages Maharashtra Bakery on Google
+                Business Profile. After they approve access, agents work on <em>their</em> business.
+              </p>
               <Button
-                variant={formData.whatsappConnected ? "default" : "outline"}
-                onClick={handleVerify}
-                disabled={formData.whatsappConnected || code.length < 4}
+                onClick={() => {
+                  window.location.href = ApiClient.getGbpOAuthUrl(orgId);
+                }}
               >
-                {verifying ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Verifying
-                  </>
-                ) : formData.whatsappConnected ? (
-                  <>
-                    <CheckCircle2 className="mr-2 h-4 w-4" />
-                    Verified
-                  </>
-                ) : (
-                  "Verify"
-                )}
+                Continue with Google
               </Button>
             </div>
+
+            <details className="rounded-lg border border-border p-3">
+              <summary className="cursor-pointer text-sm font-medium text-muted-foreground">
+                Can&apos;t sign in yet? Find on Google Maps (read-only)
+              </summary>
+              <div className="mt-3 space-y-2">
+                <p className="text-xs text-muted-foreground">
+                  Public listing only — agents cannot publish as the business until owner login.
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    className={inputClass}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Maharashtra Bakery"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") void handleSearch();
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => void handleSearch()}
+                    disabled={searching}
+                  >
+                    {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Search"}
+                  </Button>
+                </div>
+                {hits.length > 0 && (
+                  <div className="max-h-56 space-y-2 overflow-y-auto rounded-md border border-border p-2">
+                    {hits.map((hit) => (
+                      <button
+                        key={hit.place_id}
+                        type="button"
+                        disabled={!!linkingId}
+                        onClick={() => void handleLinkPlace(hit.place_id)}
+                        className="flex w-full flex-col gap-0.5 rounded-md px-3 py-2 text-left text-sm hover:bg-muted/60"
+                      >
+                        <span className="font-medium">{hit.name}</span>
+                        <span className="text-xs text-muted-foreground">{hit.address}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {hit.rating != null ? `★ ${hit.rating}` : "No rating"}
+                          {hit.review_count != null ? ` · ${hit.review_count} reviews` : ""}
+                          {linkingId === hit.place_id ? " · Linking…" : ""}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </details>
           </div>
         )}
-
         {error && (
           <div className="flex items-center gap-2 text-sm text-danger">
-            <AlertCircle className="h-4 w-4" />
-            {error}
+            <AlertCircle className="h-4 w-4" /> {error}
           </div>
         )}
-
-        {formData.whatsappConnected && (
-          <div className="flex items-center gap-3 rounded-lg border border-success/20 bg-success/5 p-4">
-            <CheckCircle2 className="h-5 w-5 text-success" />
-            <p className="text-sm font-medium text-success">
-              WhatsApp verified and connected!
-            </p>
-          </div>
-        )}
-
-        <div className="flex justify-between">
-          <Button variant="ghost" size="sm" onClick={onBack}>
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back
-          </Button>
-          <Button
-            variant={canProceed ? "default" : "outline"}
-            size="sm"
-            onClick={onNext}
-            disabled={!canProceed}
-          >
-            Next
-            <ArrowRight className="ml-2 h-4 w-4" />
+        <div className="flex justify-end">
+          <Button size="sm" onClick={onNext} disabled={!connected}>
+            Next <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
         </div>
       </CardContent>
@@ -554,474 +463,413 @@ function Step2WhatsApp({
   );
 }
 
-// ── Step 3: Set Territory ──
-
-function Step3Territory({
-  formData,
-  setFormData,
+function StepTerritory({
+  orgId,
   onNext,
   onBack,
-  orgId,
 }: {
-  formData: FormData;
-  setFormData: React.Dispatch<React.SetStateAction<FormData>>;
+  orgId: string;
   onNext: () => void;
   onBack: () => void;
-  orgId: string;
 }) {
-  const [error, setError] = React.useState("");
-  const [saving, setSaving] = React.useState(false);
+  const [address, setAddress] = React.useState("");
+  const [city, setCity] = React.useState("Bangalore");
+  const [category, setCategory] = React.useState("bakery");
+  const [radius, setRadius] = React.useState(5);
+  const [keywords, setKeywords] = React.useState<string[]>([]);
   const [saved, setSaved] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
+  const [error, setError] = React.useState("");
+  const [conflictMsg, setConflictMsg] = React.useState("");
+
+  React.useEffect(() => {
+    void (async () => {
+      try {
+        const { data } = await ApiClient.getOrg(orgId);
+        if (data.address) setAddress(data.address);
+        if (data.city) setCity(data.city);
+        if (data.category) setCategory(data.category);
+      } catch {
+        /* ignore */
+      }
+    })();
+  }, [orgId]);
 
   const handleSave = async () => {
-    if (!formData.territoryAddress.trim()) {
-      setError("Please enter your business address");
+    if (!address.trim()) {
+      setError("Enter a business address to geocode");
       return;
     }
-    if (!formData.territoryCategory) {
-      setError("Please select a business category");
-      return;
-    }
-    if (!orgId) {
-      setError("Organization not found");
-      return;
-    }
-    setError("");
     setSaving(true);
+    setError("");
+    setConflictMsg("");
     try {
-      const check = await ApiClient.checkTerritory(orgId, 12.97, 77.59);
-      const hasConflict = check.data?.has_conflict ?? false;
-      await ApiClient.claimTerritory({
+      const geo = await ApiClient.geocodeOrg(orgId, { address: address.trim(), save: true });
+      const lat = geo.data.latitude;
+      const lng = geo.data.longitude;
+      if (geo.data.formatted_address) setAddress(geo.data.formatted_address);
+
+      const check = await ApiClient.checkTerritory(orgId, lat, lng);
+      if (check.data?.has_conflict && check.data.resolution === "decline") {
+        setError(check.data.message || "Territory conflict — choose another area");
+        return;
+      }
+      if (check.data?.has_conflict) {
+        setConflictMsg(check.data.message || "Nearby clients found — keywords will be partitioned.");
+      }
+
+      const claim = await ApiClient.claimTerritory({
         org_id: orgId,
-        latitude: 12.97,
-        longitude: 77.59,
-        city: "Bangalore",
-        category: formData.territoryCategory,
-        radius_km: formData.territoryRadius,
+        latitude: lat,
+        longitude: lng,
+        city: city.trim() || "Bangalore",
+        category,
+        radius_km: radius,
+        address: geo.data.formatted_address || address.trim(),
       });
-      await ApiClient.updateOrg(orgId, {
-        onboarding_status: "territory_set",
-      } as never);
-      setFormData((prev) => ({ ...prev, territoryConflict: hasConflict }));
+      setKeywords(claim.data?.assigned_keywords ?? []);
+      await ApiClient.updateOrg(orgId, { onboarding_status: "territory_set" } as never);
       setSaved(true);
-    } catch {
-      setError("Failed to claim territory");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to claim territory");
     } finally {
       setSaving(false);
     }
   };
-
-  const canProceed = saved;
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <MapIcon className="h-5 w-5 text-primary" />
-          Set Your Territory
+          Location & keywords
         </CardTitle>
         <CardDescription>
-          Define your service area so we can optimize your local presence.
+          Confirm where the business operates. We geocode this for rankings and assign local keywords.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div>
-          <label className="mb-1.5 block text-sm font-medium text-foreground">
-            Business Address
-          </label>
-          <input
-            type="text"
-            value={formData.territoryAddress}
-            onChange={(e) =>
-              setFormData((prev) => ({
-                ...prev,
-                territoryAddress: e.target.value,
-              }))
-            }
-            placeholder="123 Main Street, Mumbai, Maharashtra"
-            className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-          />
+          <label className="mb-1.5 block text-sm font-medium">Address</label>
+          <input className={inputClass} value={address} onChange={(e) => setAddress(e.target.value)} disabled={saved} />
         </div>
-
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-foreground">
-            Business Category
-          </label>
-          <select
-            value={formData.territoryCategory}
-            onChange={(e) =>
-              setFormData((prev) => ({
-                ...prev,
-                territoryCategory: e.target.value,
-              }))
-            }
-            className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-          >
-            <option value="">Select a category</option>
-            {CATEGORIES.map((cat) => (
-              <option key={cat.value} value={cat.value}>
-                {cat.label}
-              </option>
-            ))}
-          </select>
-          {formData.territoryCategory && (
-            <div className="mt-2">
-              <Badge variant="info">
-                <Building2 className="mr-1 h-3 w-3" />
-                {
-                  CATEGORIES.find(
-                    (c) => c.value === formData.territoryCategory
-                  )?.label
-                }
-              </Badge>
-            </div>
-          )}
-        </div>
-
-        <div>
-          <div className="flex items-center justify-between mb-1.5">
-            <label className="block text-sm font-medium text-foreground">
-              Service Radius
-            </label>
-            <span className="text-sm font-medium text-primary">
-              {formData.territoryRadius} km
-            </span>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label className="mb-1.5 block text-sm font-medium">City</label>
+            <input className={inputClass} value={city} onChange={(e) => setCity(e.target.value)} disabled={saved} />
           </div>
+          <div>
+            <label className="mb-1.5 block text-sm font-medium">Category</label>
+            <select className={inputClass} value={category} onChange={(e) => setCategory(e.target.value)} disabled={saved}>
+              {CATEGORIES.map((cat) => (
+                <option key={cat.value} value={cat.value}>{cat.label}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div>
+          <label className="mb-1.5 block text-sm font-medium">Service radius: {radius} km</label>
           <input
             type="range"
-            min={1}
-            max={10}
-            value={formData.territoryRadius}
-            onChange={(e) =>
-              setFormData((prev) => ({
-                ...prev,
-                territoryRadius: Number(e.target.value),
-              }))
-            }
-            className="w-full accent-primary"
+            min={2}
+            max={15}
+            value={radius}
+            disabled={saved}
+            onChange={(e) => setRadius(Number(e.target.value))}
+            className="w-full"
           />
-          <div className="flex justify-between text-xs text-muted-foreground mt-1">
-            <span>1 km</span>
-            <span>10 km</span>
-          </div>
         </div>
-
-        {/* Map Placeholder */}
-        <div className="flex h-40 items-center justify-center rounded-lg border border-dashed border-border bg-muted/20">
-          <div className="text-center">
-            <MapPin className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
-            <p className="text-sm text-muted-foreground">
-              Map preview will appear here
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Showing {formData.territoryRadius}km radius around your address
-            </p>
-          </div>
-        </div>
-
-        {/* Conflict Warning */}
-        {formData.territoryConflict && (
-          <div className="flex items-start gap-2 rounded-lg border border-warning/20 bg-warning/5 p-3">
-            <AlertCircle className="h-4 w-4 text-warning mt-0.5 shrink-0" />
-            <div>
-              <p className="text-sm font-medium text-warning">
-                Territory overlap detected
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Another GlamAI client operates in this area. We&apos;ll
-                coordinate to avoid conflicts.
-              </p>
+        {!saved && (
+          <Button onClick={() => void handleSave()} disabled={saving}>
+            {saving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving…</> : "Geocode & claim territory"}
+          </Button>
+        )}
+        {conflictMsg && <p className="text-xs text-amber-700">{conflictMsg}</p>}
+        {saved && keywords.length > 0 && (
+          <div className="rounded-lg border border-border p-3">
+            <p className="mb-2 text-xs font-medium text-muted-foreground">Assigned keywords</p>
+            <div className="flex flex-wrap gap-2">
+              {keywords.map((kw) => (
+                <span key={kw} className="rounded-full bg-muted px-2.5 py-1 text-xs">{kw}</span>
+              ))}
             </div>
           </div>
         )}
-
         {error && (
           <div className="flex items-center gap-2 text-sm text-danger">
-            <AlertCircle className="h-4 w-4" />
-            {error}
+            <AlertCircle className="h-4 w-4" /> {error}
           </div>
         )}
-
-        {saved && (
-          <div className="flex items-center gap-3 rounded-lg border border-success/20 bg-success/5 p-4">
-            <CheckCircle2 className="h-5 w-5 text-success" />
-            <p className="text-sm font-medium text-success">
-              Territory saved successfully!
-            </p>
-          </div>
-        )}
-
         <div className="flex justify-between">
           <Button variant="ghost" size="sm" onClick={onBack}>
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back
+            <ArrowLeft className="mr-2 h-4 w-4" /> Back
           </Button>
-          {!saved ? (
-            <Button variant="default" size="sm" onClick={handleSave} disabled={saving}>
-              {saving ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                "Save Territory"
-              )}
-            </Button>
-          ) : (
-            <Button variant="default" size="sm" onClick={onNext}>
-              Next
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-          )}
+          <Button size="sm" onClick={onNext} disabled={!saved}>
+            Next <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
         </div>
       </CardContent>
     </Card>
   );
 }
 
-// ── Step 4: Complete ──
-
-function Step4Complete({
-  formData,
-  onGoToDashboard,
+function StepWhatsApp({
+  orgId,
+  onNext,
+  onBack,
 }: {
-  formData: FormData;
-  onGoToDashboard: () => void;
+  orgId: string;
+  onNext: () => void;
+  onBack: () => void;
 }) {
+  const [phone, setPhone] = React.useState("");
+  const [saving, setSaving] = React.useState(false);
+  const [error, setError] = React.useState("");
+
+  const saveNumber = async () => {
+    const digits = phone.replace(/\D/g, "");
+    if (digits.length < 10) {
+      setError("Enter a valid WhatsApp number (min 10 digits)");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      await ApiClient.updateOrg(orgId, {
+        whatsapp_number: digits,
+        whatsapp_verified: false,
+      } as never);
+      onNext();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save number");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Phone className="h-5 w-5 text-primary" />
+          WhatsApp (optional)
+        </CardTitle>
+        <CardDescription>
+          Add later for lead routing and review requests. You can skip this step.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div>
+          <label className="mb-1.5 block text-sm font-medium">Business WhatsApp number</label>
+          <input
+            type="tel"
+            className={inputClass}
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="+91 98765 43210"
+          />
+        </div>
+        {error && (
+          <div className="flex items-center gap-2 text-sm text-danger">
+            <AlertCircle className="h-4 w-4" /> {error}
+          </div>
+        )}
+        <div className="flex justify-between gap-2">
+          <Button variant="ghost" size="sm" onClick={onBack}>
+            <ArrowLeft className="mr-2 h-4 w-4" /> Back
+          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={onNext}>
+              Skip for now
+            </Button>
+            <Button size="sm" onClick={() => void saveNumber()} disabled={saving}>
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save & continue"}
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function StepComplete({
+  orgId,
+  onBack,
+}: {
+  orgId: string;
+  onBack: () => void;
+}) {
+  const router = useRouter();
+  const [finishing, setFinishing] = React.useState(false);
+  const [error, setError] = React.useState("");
+  const [checklist, setChecklist] = React.useState<Record<string, { done: boolean; required: boolean }> | null>(null);
+
+  React.useEffect(() => {
+    void ApiClient.getOrgSetup(orgId)
+      .then((res) => setChecklist(res.data.checklist))
+      .catch(() => setChecklist(null));
+  }, [orgId]);
+
+  const finish = async () => {
+    setFinishing(true);
+    setError("");
+    try {
+      await ApiClient.completeOnboarding(orgId);
+      router.push("/client");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not complete onboarding");
+      setFinishing(false);
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <PartyPopper className="h-5 w-5 text-primary" />
-          You&apos;re All Set!
+          Ready to go
         </CardTitle>
         <CardDescription>
-          Your GlamAI account is fully configured and ready to go.
+          We’ll activate agents, save settings, and kick off a geo bootstrap for this client.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="space-y-3">
-          <div className="flex items-center gap-3 rounded-lg border border-success/20 bg-success/5 p-3">
-            <CheckCircle2 className="h-5 w-5 text-success shrink-0" />
-            <div>
-              <p className="text-sm font-medium text-foreground">
-                Google Business Profile connected
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Place ID: {formData.gbpPlaceId || "Connected"}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3 rounded-lg border border-success/20 bg-success/5 p-3">
-            <CheckCircle2 className="h-5 w-5 text-success shrink-0" />
-            <div>
-              <p className="text-sm font-medium text-foreground">
-                WhatsApp connected
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {formData.whatsappPhone}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3 rounded-lg border border-success/20 bg-success/5 p-3">
-            <CheckCircle2 className="h-5 w-5 text-success shrink-0" />
-            <div>
-              <p className="text-sm font-medium text-foreground">
-                Territory configured
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {formData.territoryAddress} · {formData.territoryRadius}km
-                radius
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Sparkles className="h-4 w-4 text-primary" />
-            <p className="text-sm font-medium text-primary">
-              What happens next?
-            </p>
-          </div>
-          <ul className="space-y-1 text-sm text-muted-foreground">
-            <li>• AI starts monitoring for leads in your area</li>
-            <li>• Weekly GBP posts will be auto-generated</li>
-            <li>• You&apos;ll get WhatsApp notifications for new leads</li>
-            <li>• Monthly reports show your growth</li>
+        {checklist && (
+          <ul className="space-y-2 text-sm">
+            {Object.entries(checklist).map(([key, item]) => (
+              <li key={key} className="flex items-center gap-2">
+                {item.done ? (
+                  <CheckCircle2 className="h-4 w-4 text-success" />
+                ) : (
+                  <AlertCircle className={cn("h-4 w-4", item.required ? "text-danger" : "text-muted-foreground")} />
+                )}
+                <span className="capitalize">{key.replaceAll("_", " ")}</span>
+                {!item.required && <span className="text-xs text-muted-foreground">(optional)</span>}
+              </li>
+            ))}
           </ul>
+        )}
+        {error && (
+          <div className="flex items-center gap-2 text-sm text-danger">
+            <AlertCircle className="h-4 w-4" /> {error}
+          </div>
+        )}
+        <div className="flex justify-between">
+          <Button variant="ghost" size="sm" onClick={onBack}>
+            <ArrowLeft className="mr-2 h-4 w-4" /> Back
+          </Button>
+          <Button onClick={() => void finish()} disabled={finishing}>
+            {finishing ? (
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Finishing…</>
+            ) : (
+              <>Go to dashboard <ArrowRight className="ml-2 h-4 w-4" /></>
+            )}
+          </Button>
         </div>
-
-        <Button className="w-full" size="lg" onClick={onGoToDashboard}>
-          Go to Dashboard
-          <ArrowRight className="ml-2 h-4 w-4" />
-        </Button>
       </CardContent>
     </Card>
   );
 }
 
-// ── Main Onboarding Page ──
-
-export default function ClientOnboardingPage() {
-  const router = useRouter();
-  const { orgId, setOrgId } = useOrgId();
-  const [currentStep, setCurrentStep] = React.useState(0);
-  const [formData, setFormData] = React.useState<FormData>({
-    gbpConnected: false,
-    gbpPlaceId: "",
-    whatsappPhone: "",
-    whatsappConnected: false,
-    territoryAddress: "",
-    territoryCategory: "interior_design",
-    territoryRadius: 5,
-    territoryConflict: false,
-  });
+export default function OnboardingPage() {
+  const { orgId, setOrgId, clearOrgId, isReady } = useOrgId();
+  const [step, setStep] = React.useState(0);
+  const [staleBanner, setStaleBanner] = React.useState<string | null>(null);
 
   React.useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (!isReady) return;
     const params = new URLSearchParams(window.location.search);
-    if (params.get("gbp") === "connected") {
-      setFormData((prev) => ({ ...prev, gbpConnected: true }));
-      setCurrentStep(1);
+    if (params.get("error") === "org_not_found") {
+      clearOrgId();
+      setStaleBanner(
+        "That business account was cleared (or never saved). Create it again below, then connect Google.",
+      );
+      window.history.replaceState({}, "", "/client/onboarding");
+      return;
     }
-  }, []);
-
-  React.useEffect(() => {
+    if (params.get("error") === "gbp_oauth_not_configured") {
+      setStaleBanner(
+        "Google Business Profile OAuth isn’t configured. Add real GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to the API .env, then restart the API.",
+      );
+      window.history.replaceState({}, "", "/client/onboarding");
+      return;
+    }
     if (!orgId) return;
-    ApiClient.getGbpConnection(orgId)
-      .then((res) => {
-        if (res.data?.connected) {
-          setFormData((prev) => ({
-            ...prev,
-            gbpConnected: true,
-            gbpPlaceId: res.data.place_id || prev.gbpPlaceId,
-          }));
+    void (async () => {
+      try {
+        const { data } = await ApiClient.getOrg(orgId);
+        const status = data.onboarding_status;
+        if (status === "created") setStep(0);
+        else if (status === "gbp_connected" || status === "whatsapp_connected") setStep(1);
+        else if (status === "territory_set") setStep(2);
+        else if (status === "onboarding_complete" || status === "active") setStep(3);
+      } catch (err) {
+        const status = (err as { status?: number })?.status;
+        if (status === 404 || status === 400 || status === 403) {
+          clearOrgId();
+          setStaleBanner(
+            "Saved business ID is no longer in the database. Create the bakery account again to continue.",
+          );
         }
-      })
-      .catch(() => {});
-  }, [orgId]);
+      }
+    })();
+  }, [orgId, isReady, clearOrgId]);
 
-  const effectiveOrgId = orgId || "";
+  if (!isReady) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
-  const progressPct = Math.round(
-    ((currentStep + 1) / STEPS.length) * 100
-  );
+  if (!orgId) {
+    return (
+      <div className="mx-auto max-w-xl space-y-4 py-8">
+        {staleBanner && (
+          <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-foreground">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            <p>{staleBanner}</p>
+          </div>
+        )}
+        {isClerkEnabled ? (
+          <BusinessSignupWithClerk onCreated={(id) => { setOrgId(id); setStep(0); setStaleBanner(null); }} />
+        ) : (
+          <BusinessSignupForm onCreated={(id) => { setOrgId(id); setStep(0); setStaleBanner(null); }} clerkUser={null} />
+        )}
+      </div>
+    );
+  }
+
+  const progress = ((step + 1) / STEPS.length) * 100;
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6 p-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">
-          Complete Your Setup
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Follow these 4 steps to get the most out of GlamAI
-        </p>
-      </div>
-
-      {/* Progress Bar */}
-      {effectiveOrgId && (
-      <div>
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-sm font-medium text-foreground">
-            Step {currentStep + 1} of {STEPS.length}
-          </span>
-          <span className="text-sm text-muted-foreground">{progressPct}%</span>
+    <div className="mx-auto max-w-xl space-y-6 py-4">
+      {staleBanner && (
+        <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-foreground">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+          <p>{staleBanner}</p>
         </div>
-        <Progress value={progressPct} />
+      )}
+      <div>
+        <div className="mb-2 flex justify-between text-xs text-muted-foreground">
+          {STEPS.map((s, i) => (
+            <span key={s.shortLabel} className={cn(i === step && "font-medium text-foreground")}>
+              {s.shortLabel}
+            </span>
+          ))}
+        </div>
+        <Progress value={progress} />
       </div>
-      )}
 
-      {/* Step Indicators */}
-      {effectiveOrgId && (
-      <div className="flex items-center justify-between">
-        {STEPS.map((step, i) => (
-          <React.Fragment key={step.shortLabel}>
-            <div className="flex flex-col items-center">
-              <div
-                className={cn(
-                  "flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold transition-colors",
-                  i < currentStep
-                    ? "bg-success text-success-foreground"
-                    : i === currentStep
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted text-muted-foreground"
-                )}
-              >
-                {i < currentStep ? (
-                  <CheckCircle2 className="h-4 w-4" />
-                ) : (
-                  i + 1
-                )}
-              </div>
-              <span
-                className={cn(
-                  "mt-1 text-xs",
-                  i === currentStep
-                    ? "font-medium text-foreground"
-                    : "text-muted-foreground"
-                )}
-              >
-                {step.label}
-              </span>
-            </div>
-            {i < STEPS.length - 1 && (
-              <div
-                className={cn(
-                  "mx-2 h-0.5 flex-1 transition-colors",
-                  i < currentStep ? "bg-success" : "bg-muted"
-                )}
-              />
-            )}
-          </React.Fragment>
-        ))}
-      </div>
+      {step === 0 && <StepGbp orgId={orgId} onNext={() => setStep(1)} />}
+      {step === 1 && (
+        <StepTerritory orgId={orgId} onNext={() => setStep(2)} onBack={() => setStep(0)} />
       )}
-
-      {/* Step Content */}
-      {!effectiveOrgId ? (
-        <BusinessSignup onCreated={() => {}} />
-      ) : currentStep === 0 ? (
-        <Step1Gbp
-          formData={formData}
-          setFormData={setFormData}
-          onNext={() => setCurrentStep(1)}
-          orgId={effectiveOrgId}
-        />
-      ) : null}
-      {effectiveOrgId && currentStep === 1 && (
-        <Step2WhatsApp
-          formData={formData}
-          setFormData={setFormData}
-          onNext={() => setCurrentStep(2)}
-          onBack={() => setCurrentStep(0)}
-          orgId={effectiveOrgId}
-        />
+      {step === 2 && (
+        <StepWhatsApp orgId={orgId} onNext={() => setStep(3)} onBack={() => setStep(1)} />
       )}
-      {effectiveOrgId && currentStep === 2 && (
-        <Step3Territory
-          formData={formData}
-          setFormData={setFormData}
-          onNext={() => setCurrentStep(3)}
-          onBack={() => setCurrentStep(1)}
-          orgId={effectiveOrgId}
-        />
-      )}
-      {effectiveOrgId && currentStep === 3 && (
-        <Step4Complete
-          formData={formData}
-          onGoToDashboard={async () => {
-            if (effectiveOrgId) {
-              await ApiClient.updateOrg(effectiveOrgId, {
-                onboarding_status: "active",
-              } as never);
-              setOrgId(effectiveOrgId);
-            }
-            router.push("/client");
-          }}
-        />
-      )}
+      {step === 3 && <StepComplete orgId={orgId} onBack={() => setStep(2)} />}
     </div>
   );
 }

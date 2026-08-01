@@ -1,64 +1,44 @@
 "use client";
 
 import * as React from "react";
-import { isClerkEnabled } from "@/lib/auth-config";
 
 const ORG_STORAGE_KEY = "glamai_org_id";
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 type OrgContextValue = {
   orgId: string | null;
+  isReady: boolean;
   setOrgId: (id: string) => void;
   clearOrgId: () => void;
 };
 
 const OrgContext = React.createContext<OrgContextValue>({
   orgId: null,
+  isReady: false,
   setOrgId: () => {},
   clearOrgId: () => {},
 });
 
-async function fetchDemoOrgId(): Promise<string | null> {
-  try {
-    const res = await fetch(`${API_BASE}/api/v1/demo/account`);
-    if (!res.ok) return null;
-    const json = await res.json();
-    return json.data?.org_id ?? null;
-  } catch {
-    return null;
-  }
-}
-
 export function OrgProvider({ children }: { children: React.ReactNode }) {
   const [orgId, setOrgIdState] = React.useState<string | null>(null);
+  const [isReady, setIsReady] = React.useState(false);
 
   React.useEffect(() => {
-    const params =
-      typeof window !== "undefined"
-        ? new URLSearchParams(window.location.search).get("org")
-        : null;
-    const fromStorage =
-      typeof window !== "undefined" ? localStorage.getItem(ORG_STORAGE_KEY) : null;
+    const fromUrl = new URLSearchParams(window.location.search).get("org");
+    const fromStorage = localStorage.getItem(ORG_STORAGE_KEY);
 
-    if (params) {
-      localStorage.setItem(ORG_STORAGE_KEY, params);
-      setOrgIdState(params);
+    if (fromUrl) {
+      localStorage.setItem(ORG_STORAGE_KEY, fromUrl);
+      setOrgIdState(fromUrl);
+      setIsReady(true);
       return;
     }
 
+    // Do not auto-load seeded demo — onboard the real client's GBP org.
     if (fromStorage) {
       setOrgIdState(fromStorage);
-      return;
     }
 
-    if (!isClerkEnabled) {
-      fetchDemoOrgId().then((id) => {
-        if (id) {
-          localStorage.setItem(ORG_STORAGE_KEY, id);
-          setOrgIdState(id);
-        }
-      });
-    }
+    setIsReady(true);
   }, []);
 
   const setOrgId = React.useCallback((id: string) => {
@@ -72,7 +52,7 @@ export function OrgProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <OrgContext.Provider value={{ orgId, setOrgId, clearOrgId }}>
+    <OrgContext.Provider value={{ orgId, isReady, setOrgId, clearOrgId }}>
       {children}
     </OrgContext.Provider>
   );
@@ -85,7 +65,7 @@ export function useOrgId() {
 export function useRequiredOrgId(): string {
   const { orgId } = useOrgId();
   if (!orgId) {
-    throw new Error("No org context — complete onboarding first");
+    throw new Error("Organization ID required");
   }
   return orgId;
 }

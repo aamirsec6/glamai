@@ -2,9 +2,87 @@ import type { GbpCompetitor, GbpPost, GbpRanking } from "@/types";
 import { API_BASE, apiPost, fetcher, getOrgHeaders } from "./client";
 
 export async function getGbpConnection(org_id: string): Promise<{
-  data: { connected: boolean; place_id: string | null; gbp_name: string | null; last_synced_at: string | null };
+  data: {
+    connected: boolean;
+    place_id: string | null;
+    gbp_name: string | null;
+    gbp_status?: string | null;
+    link_source?: "places" | "oauth" | null;
+    last_synced_at: string | null;
+    review_link?: string | null;
+  };
 }> {
   return fetcher(`/api/v1/gbp/connection?org_id=${org_id}`);
+}
+
+export async function getGbpLocations(org_id: string): Promise<{
+  data: {
+    status: string;
+    selected: string | null;
+    locations: Array<{
+      name: string;
+      title?: string;
+      store_code?: string;
+      address?: Record<string, unknown>;
+    }>;
+  };
+}> {
+  return fetcher(`/api/v1/gbp/locations?org_id=${org_id}`);
+}
+
+export async function selectGbpLocation(
+  org_id: string,
+  location_name: string,
+): Promise<{ data: { place_id: string; gbp_name?: string } }> {
+  return apiPost(
+    "/api/v1/gbp/locations/select",
+    { org_id, location_name },
+    "Failed to select GBP location",
+  );
+}
+
+export type PlacesSearchHit = {
+  place_id: string;
+  name: string;
+  address?: string;
+  rating?: number;
+  review_count?: number;
+  maps_uri?: string;
+  phone?: string;
+  website?: string;
+};
+
+export async function searchGbpPlaces(
+  org_id: string,
+  query?: string,
+): Promise<{ data: { status: string; results: PlacesSearchHit[]; query?: string } }> {
+  return apiPost(
+    "/api/v1/gbp/places/search",
+    { org_id, query },
+    "Places search failed",
+  );
+}
+
+export async function linkGbpPlace(
+  org_id: string,
+  place_id: string,
+): Promise<{
+  data: {
+    status: string;
+    place_id?: string;
+    gbp_name?: string;
+    rating?: number;
+    review_count?: number;
+    reviews_imported?: number;
+    address?: string;
+  };
+  message?: string;
+}> {
+  return apiPost(
+    "/api/v1/gbp/places/link",
+    { org_id, place_id },
+    "Failed to link Google business",
+  );
 }
 
 export async function getGbpInsights(org_id: string): Promise<{ data: Record<string, unknown> | null }> {

@@ -60,6 +60,13 @@ export function useOrgDashboard(orgId: string) {
   return useSWR(orgId ? `/api/v1/orgs/${orgId}/dashboard` : null, fetcher, swrConfig);
 }
 
+export function useOrgSetup(orgId: string) {
+  return useSWR(orgId ? `/api/v1/orgs/${orgId}/setup` : null, fetcher, {
+    ...swrConfig,
+    refreshInterval: 15000,
+  });
+}
+
 export function useGbpPosts(orgId: string) {
   return useSWR(orgId ? `/api/v1/gbp/posts?org_id=${orgId}` : null, fetcher, swrConfig);
 }
@@ -104,4 +111,12 @@ export function useIntegrationHealth(orgId: string) {
 
 export function useUserJourney(orgId: string) {
   return useSWR(orgId ? `/api/v1/admin/orgs/${orgId}/journey` : null, fetcher, swrConfig);
+}
+
+export function useSeoScorecard(orgId: string) {
+  return useSWR(
+    orgId ? `/api/v1/agents/seo/scorecard?org_id=${orgId}` : null,
+    fetcher,
+    swrConfig,
+  );
 }

@@ -1,21 +1,12 @@
 import type { MonthlyReport, NotificationLog, Org, Territory } from "@/types";
-import { API_BASE, apiPost, fetcher } from "./client";
+import { apiPost, fetcher } from "./client";
 
 export async function seedDemoAccount(reset = false): Promise<{
   org_id: string;
   client_url: string;
   ai_url: string;
 }> {
-  const res = await fetch(`${API_BASE}/api/v1/demo/seed?reset=${reset}`, {
-    method: "POST",
-  });
-  if (!res.ok) throw new Error("Demo seed failed");
-  const json = await res.json();
-  return {
-    org_id: json.org_id,
-    client_url: json.client_url,
-    ai_url: json.ai_url,
-  };
+  return apiPost(`/api/v1/demo/seed?reset=${reset}`, undefined, "Demo seed failed");
 }
 
 export async function generateReport(org_id: string, async = true): Promise<{ message: string; task_id?: string }> {
@@ -40,13 +31,15 @@ export async function claimTerritory(data: {
   category: string;
   radius_km?: number;
   is_exclusive?: boolean;
-}): Promise<{ data: { territory: Territory; assigned_keywords: string[] } }> {
-  const res = await fetch(`${API_BASE}/api/v1/territory/claim`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
-  return res.json();
+  address?: string;
+}): Promise<{
+  data: {
+    territory: Territory;
+    assigned_keywords: string[];
+    conflict_info?: { has_conflict: boolean; message: string };
+  };
+}> {
+  return apiPost("/api/v1/territory/claim", data, "Failed to claim territory");
 }
 
 export async function getReports(org_id: string): Promise<{ data: MonthlyReport[] }> {
@@ -65,8 +58,7 @@ export async function trackEvent(event: {
   element?: string;
   metadata?: Record<string, unknown>;
 }): Promise<void> {
-  // Fire-and-forget tracking
-  fetch(`${API_BASE}/api/v1/track`, {
+  fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/v1/track`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(event),

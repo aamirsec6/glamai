@@ -129,6 +129,7 @@ export function getCategoryLabel(category: string): string {
     architect: "Architect",
     photographer: "Photographer",
     restaurant: "Restaurant",
+    bakery: "Bakery",
     other: "Other",
   };
   return labels[category] || category;

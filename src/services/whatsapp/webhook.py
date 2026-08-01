@@ -180,13 +180,35 @@ class WhatsappWebhookHandler:
         )
         db.add(conversation)
 
-        # Process through AI qualification flow
-        ai_response = await self.ai.process_message(
-            message_text=message_text,
-            lead=lead,
+        campaign_handled = await self._handle_campaign_reply(
             org=org,
+            lead=lead,
+            message_text=message_text,
             db=db,
         )
+
+        if campaign_handled:
+            reply_text = (
+                f"Thanks for your interest! 🙏 Our team at {org.name} will call you shortly."
+            )
+            ai_response = {
+                "reply": reply_text,
+                "intent": "campaign_reply",
+                "extracted_entities": {"campaign_reply": message_text.strip().upper()},
+                "notify_designer": True,
+            }
+            conversation.ai_intent = "campaign_reply"
+            conversation.ai_extracted_entities = ai_response["extracted_entities"]
+        else:
+            # Process through AI qualification flow
+            ai_response = await self.ai.process_message(
+                message_text=message_text,
+                lead=lead,
+                org=org,
+                db=db,
+            )
+            conversation.ai_intent = ai_response.get("intent")
+            conversation.ai_extracted_entities = ai_response.get("extracted_entities")
 
         # Send AI response back to lead
         if ai_response and ai_response.get("reply"):
@@ -274,6 +296,46 @@ class WhatsappWebhookHandler:
         )
         result = await db.execute(stmt)
         return result.scalar_one_or_none()
+
+    async def _handle_campaign_reply(
+        self,
+        org: Org,
+        lead: Lead,
+        message_text: str,
+        db: AsyncSession,
+    ) -> bool:
+        """Route YES/INTERESTED replies to recent marketing campaigns."""
+        normalized = message_text.strip().upper()
+        if normalized not in ("YES", "INTERESTED"):
+            return False
+
+        from sqlmodel import select
+
+        from src.models.campaign import CampaignRecipient, RecipientStatus
+
+        phone_suffix = lead.contact_phone[-10:]
+        stmt = (
+            select(CampaignRecipient)
+            .where(
+                CampaignRecipient.org_id == org.id,
+                CampaignRecipient.status == RecipientStatus.SENT,
+            )
+            .order_by(CampaignRecipient.sent_at.desc())
+            .limit(20)
+        )
+        result = await db.execute(stmt)
+        recipients = result.scalars().all()
+        matched = next(
+            (r for r in recipients if phone_suffix in (r.phone or "").replace("+", "")[-10:]),
+            None,
+        )
+        if not matched:
+            return False
+
+        lead.status = LeadStatus.CONTACTED
+        lead.status_changed_at = datetime.utcnow()
+        db.add(lead)
+        return True
 
     async def _find_or_create_lead(
         self,

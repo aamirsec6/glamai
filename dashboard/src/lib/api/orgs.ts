@@ -79,7 +79,10 @@ export async function sendOrgMessage(
   return apiPost(`/api/v1/admin/orgs/${id}/message`, { message }, "Failed to send message");
 }
 
-export async function createOrg(data: Partial<Org>): Promise<{ data: Org }> {
+export async function createOrg(data: Partial<Org> & {
+  clerk_user_id?: string;
+  clerk_email?: string | null;
+}): Promise<{ data: Org; member_link_error?: string }> {
   return apiPost("/api/v1/orgs/", data, "Failed to create organization");
 }
 
@@ -89,7 +92,49 @@ export async function updateOrg(id: string, data: Partial<Org>): Promise<{ data:
     headers: { "Content-Type": "application/json", ...getOrgHeaders() },
     body: JSON.stringify(data),
   });
+  if (!res.ok) {
+    const parsed = await res.json().catch(() => ({}));
+    throw new Error((parsed as { detail?: string }).detail || "Failed to update organization");
+  }
   return res.json();
+}
+
+export async function geocodeOrg(
+  orgId: string,
+  data?: { address?: string; save?: boolean },
+): Promise<{
+  data: { latitude: number; longitude: number; formatted_address?: string; saved: boolean };
+}> {
+  return apiPost(`/api/v1/orgs/${orgId}/geocode`, data ?? { save: true }, "Geocode failed");
+}
+
+export async function getOrgSetup(orgId: string): Promise<{
+  data: {
+    org_id: string;
+    onboarding_status: string;
+    is_complete: boolean;
+    ready_for_agents: boolean;
+    checklist: Record<string, { done: boolean; required: boolean }>;
+    missing_required: string[];
+    keyword_count: number;
+    next_path: string | null;
+  };
+}> {
+  return fetcher(`/api/v1/orgs/${orgId}/setup`);
+}
+
+export async function completeOnboarding(orgId: string): Promise<{
+  data: Org;
+  message: string;
+  geo_task_id?: string | null;
+}> {
+  return apiPost(`/api/v1/orgs/${orgId}/complete-onboarding`, undefined, "Failed to complete onboarding");
+}
+
+export async function listMyOrgs(clerk_user_id: string): Promise<{
+  data: Array<Org & { role: string }>;
+}> {
+  return fetcher(`/api/v1/orgs/mine?clerk_user_id=${encodeURIComponent(clerk_user_id)}`);
 }
 
 export async function getOrgDashboard(id: string): Promise<{

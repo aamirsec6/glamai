@@ -40,15 +40,33 @@ DEMO_SLUG = "studio-indiranagar-demo"
 DEMO_NAME = "Studio Indiranagar"
 
 
+PILOT_SLUGS = (
+    "design-hub-koramangala",
+    "atelier-whitefield",
+    "spaces-btm",
+    "nova-interiors-hsr",
+)
+
+
 async def _purge_org(session: AsyncSession, org_id: str) -> None:
     """Remove child rows before deleting a demo org."""
+    from src.models.campaign import CampaignRecipient
+    from src.models.integration import OrgIntegration, OrgSettings, WebhookEvent
+    from src.models.journey import UserJourneyEvent, VoiceCall
     from src.models.member import OrgMember
+    from src.models.notification import NotificationLog
     from src.models.review import ReviewRequest
-    from src.models.territory import Territory
+    from src.models.territory import KeywordNiche, Territory
 
+    # Children that reference leads / campaigns first
+    await session.execute(delete(CampaignRecipient).where(CampaignRecipient.org_id == org_id))
     await session.execute(delete(WhatsappConversation).where(WhatsappConversation.org_id == org_id))
-    await session.execute(delete(GbpProfileSnapshot).where(GbpProfileSnapshot.org_id == org_id))
     await session.execute(delete(ReviewRequest).where(ReviewRequest.org_id == org_id))
+    await session.execute(delete(NotificationLog).where(NotificationLog.org_id == org_id))
+    await session.execute(delete(GbpProfileSnapshot).where(GbpProfileSnapshot.org_id == org_id))
+    await session.execute(delete(KeywordNiche).where(KeywordNiche.org_id == org_id))
+    await session.execute(delete(UserJourneyEvent).where(UserJourneyEvent.org_id == org_id))
+    await session.execute(delete(VoiceCall).where(VoiceCall.org_id == org_id))
     await session.execute(delete(Lead).where(Lead.org_id == org_id))
     for model in (
         GbpPost,
@@ -61,8 +79,42 @@ async def _purge_org(session: AsyncSession, org_id: str) -> None:
         MarketingCampaign,
         OrgMember,
         Territory,
+        OrgIntegration,
+        OrgSettings,
+        WebhookEvent,
     ):
         await session.execute(delete(model).where(model.org_id == org_id))
+    await session.flush()
+
+
+async def delete_demo_account(session: AsyncSession) -> bool:
+    """Delete seeded demo + pilot orgs and all related data."""
+    deleted_any = False
+
+    existing = (
+        await session.execute(select(Org).where(Org.slug == DEMO_SLUG))
+    ).scalar_one_or_none()
+    if existing:
+        await _purge_org(session, existing.id)
+        await session.delete(existing)
+        await session.flush()
+        logger.info("demo_org_deleted", org_id=existing.id, slug=DEMO_SLUG)
+        deleted_any = True
+    else:
+        logger.info("demo_org_absent")
+
+    pilots = (
+        await session.execute(select(Org).where(Org.slug.in_(PILOT_SLUGS)))
+    ).scalars().all()
+    for org in pilots:
+        await _purge_org(session, org.id)
+        await session.delete(org)
+        deleted_any = True
+        logger.info("pilot_org_deleted", org_id=org.id, slug=org.slug)
+    if pilots:
+        await session.flush()
+
+    return deleted_any
 
 
 async def seed_demo_account(session: AsyncSession, *, reset: bool = False) -> str:

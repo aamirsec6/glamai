@@ -2,15 +2,18 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import * as React from "react";
-import { useReports } from "@/lib/api";
+import ApiClient, { useReports } from "@/lib/api";
 import { useOrgId } from "@/lib/org-context";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants, buttonSizes } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
+import { ClientPageHeader } from "@/components/client/page-header";
+import { AlertBanner } from "@/components/client/alert-banner";
+import { OrgEmptyState } from "@/components/client/org-empty-state";
 import { formatCurrency, calculateChange } from "@/lib/utils";
 import type { MonthlyReport } from "@/types";
-import { FileText, Download, TrendingUp, TrendingDown, Users, Eye, Star, Minus } from "lucide-react";
+import { FileText, Download, TrendingUp, TrendingDown, Users, Eye, Star, Minus, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 function ChangeIndicator({ value }: { value: number }) {
@@ -109,15 +112,56 @@ function ReportCardSkeleton() {
 
 export default function ClientReportsPage() {
   const orgId = useOrgId().orgId || "";
-  const { data, isLoading } = useReports(orgId);
+  const { data, isLoading, mutate } = useReports(orgId);
+  const [generating, setGenerating] = React.useState(false);
+  const [banner, setBanner] = React.useState<string | null>(null);
   const reports: MonthlyReport[] = data?.data ?? [];
+
+  const handleGenerate = async () => {
+    if (!orgId) return;
+    setGenerating(true);
+    setBanner(null);
+    try {
+      const res = await ApiClient.generateReport(orgId, false);
+      setBanner(res.message || "Report generation started.");
+      await mutate();
+    } catch (e) {
+      setBanner(e instanceof Error ? e.message : "Could not generate report");
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  if (!orgId) {
+    return (
+      <div className="py-8">
+        <OrgEmptyState title="Reports" description="Connect a business to view monthly reports." />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Reports</h1>
-        <p className="text-sm text-muted-foreground">Monthly performance reports and analytics</p>
-      </div>
+      <ClientPageHeader
+        title="Reports"
+        description="Monthly performance summaries — leads, revenue, GBP views, and reviews."
+        actions={
+          <Button size="sm" onClick={handleGenerate} disabled={generating}>
+            {generating ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Generating…
+              </>
+            ) : (
+              "Generate report"
+            )}
+          </Button>
+        }
+      />
+
+      {banner && (
+        <AlertBanner variant="success" message={banner} onDismiss={() => setBanner(null)} />
+      )}
       {isLoading ? (
         <div className="space-y-4">{[...Array(3)].map((_, i) => <ReportCardSkeleton key={i} />)}</div>
       ) : reports.length === 0 ? (

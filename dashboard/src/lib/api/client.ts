@@ -15,7 +15,7 @@ export const fetcher = async (url: string) => {
   const res = await fetch(`${API_BASE}${url}`, { headers: getOrgHeaders() });
   if (!res.ok) {
     const error = new Error("API request failed");
-    (error as unknown as { status: number }).status = res.status;
+    (error as Error & { status: number }).status = res.status;
     throw error;
   }
   return res.json();
@@ -35,7 +35,14 @@ export async function apiPost<T>(
   });
   if (!res.ok) {
     const parsed = await res.json().catch(() => ({}));
-    throw new Error((parsed as { detail?: string }).detail || errorMessage);
+    const detail = (parsed as { detail?: string | Array<{ msg?: string }> }).detail;
+    const message =
+      typeof detail === "string"
+        ? detail
+        : Array.isArray(detail)
+          ? detail.map((d) => d.msg).filter(Boolean).join("; ")
+          : errorMessage;
+    throw new Error(message || errorMessage);
   }
   return res.json();
 }

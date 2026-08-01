@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import {
   Card,
   CardContent,
@@ -12,22 +13,22 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import ApiClient, { useGbpConnection, useIntegrationHealth, useOrgDashboard } from "@/lib/api";
+import { useOrgId } from "@/lib/org-context";
+import { ClientPageHeader } from "@/components/client/page-header";
+import { AlertBanner } from "@/components/client/alert-banner";
+import { OrgEmptyState } from "@/components/client/org-empty-state";
+import { formatRelativeTime } from "@/lib/utils";
 import {
   CreditCard,
   Bell,
   MapPin,
   Link2,
-  AlertTriangle,
   CheckCircle2,
   XCircle,
-  Pause,
-  Trash2,
   Crown,
   Zap,
-  Building2,
 } from "lucide-react";
-
-// ── Toggle Switch ──────────────────────────────────────────────
 
 function Toggle({
   enabled,
@@ -44,21 +45,21 @@ function Toggle({
     <div className="flex items-center justify-between py-3">
       <div>
         <p className="text-sm font-medium text-foreground">{label}</p>
-        {description && (
-          <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
-        )}
+        {description && <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>}
       </div>
       <button
+        type="button"
         onClick={() => onChange(!enabled)}
         className={cn(
-          "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
-          enabled ? "bg-primary" : "bg-muted"
+          "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors",
+          enabled ? "bg-primary" : "bg-muted",
         )}
+        aria-pressed={enabled}
       >
         <span
           className={cn(
-            "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
-            enabled ? "translate-x-5" : "translate-x-0"
+            "pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transition",
+            enabled ? "translate-x-5" : "translate-x-0",
           )}
         />
       </button>
@@ -66,30 +67,124 @@ function Toggle({
   );
 }
 
-// ── Main Page ──────────────────────────────────────────────────
+const PLAN_LABELS: Record<string, string> = {
+  free: "Free",
+  starter: "Starter",
+  growth: "Growth",
+  enterprise: "Enterprise",
+};
+
+const DEFAULT_NOTIFS = {
+  newLead: true,
+  weeklySummary: true,
+  monthlyReport: true,
+  marketingTips: false,
+};
+
+function notifStorageKey(orgId: string) {
+  return `qimma-notif-prefs:${orgId}`;
+}
 
 export default function ClientSettingsPage() {
-  const [notifications, setNotifications] = React.useState({
-    newLead: true,
-    weeklySummary: true,
-    monthlyReport: true,
-    marketingTips: false,
-  });
+  const { orgId } = useOrgId();
+  const { data: dashboard, isLoading } = useOrgDashboard(orgId || "");
+  const { data: gbpData } = useGbpConnection(orgId || "");
+  const { data: healthData } = useIntegrationHealth(orgId || "");
+  const [notifications, setNotifications] = React.useState(DEFAULT_NOTIFS);
+  const [banner, setBanner] = React.useState<string | null>(null);
+  const [waPhone, setWaPhone] = React.useState("");
+  const [savingWa, setSavingWa] = React.useState(false);
 
-  const toggleNotification = (key: keyof typeof notifications) => {
-    setNotifications((prev) => ({ ...prev, [key]: !prev[key] }));
+  const org = dashboard?.data?.org;
+  const onboarding = dashboard?.data?.onboarding;
+  const gbpConnected = gbpData?.data?.connected ?? false;
+  const whatsappConnected = !!org?.whatsapp_number;
+  const health = healthData?.data ?? [];
+
+  React.useEffect(() => {
+    if (org?.whatsapp_number) setWaPhone(org.whatsapp_number);
+  }, [org?.whatsapp_number]);
+
+  React.useEffect(() => {
+    if (!orgId || typeof window === "undefined") return;
+    try {
+      const raw = localStorage.getItem(notifStorageKey(orgId));
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as Partial<typeof DEFAULT_NOTIFS>;
+      setNotifications({ ...DEFAULT_NOTIFS, ...parsed });
+    } catch {
+      /* ignore corrupt prefs */
+    }
+  }, [orgId]);
+
+  const handleReconnectGbp = () => {
+    if (!orgId) return;
+    window.location.href = ApiClient.getGbpOAuthUrl(orgId);
   };
 
+  const handleSaveNotifications = () => {
+    if (!orgId) return;
+    localStorage.setItem(notifStorageKey(orgId), JSON.stringify(notifications));
+    setBanner("Notification preferences saved on this device.");
+  };
+
+  const handleSaveWhatsApp = async () => {
+    if (!orgId) return;
+    const digits = waPhone.replace(/\D/g, "");
+    if (digits.length < 10) {
+      setBanner("Enter a valid WhatsApp number (min 10 digits).");
+      return;
+    }
+    setSavingWa(true);
+    try {
+      await ApiClient.updateOrg(orgId, {
+        whatsapp_number: digits,
+        whatsapp_verified: false,
+      } as never);
+      setBanner("WhatsApp number saved.");
+    } catch (e) {
+      setBanner(e instanceof Error ? e.message : "Failed to save WhatsApp number.");
+    } finally {
+      setSavingWa(false);
+    }
+  };
+
+  if (!orgId) {
+    return (
+      <div className="py-8">
+        <OrgEmptyState title="Settings" description="Connect a business to manage your account." />
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-16 w-full" />
+        <Skeleton className="h-48" />
+        <Skeleton className="h-48" />
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6">
-      {/* Plan & Billing */}
+    <div className="mx-auto max-w-3xl space-y-6">
+      <ClientPageHeader
+        title="Settings"
+        description="Your plan, connections, territory, and notification preferences."
+      />
+
+      {banner && (
+        <AlertBanner variant="success" message={banner} onDismiss={() => setBanner(null)} />
+      )}
+
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
             <CreditCard className="h-5 w-5 text-primary" />
-            <CardTitle>Plan & Billing</CardTitle>
+            <CardTitle>Plan & billing</CardTitle>
           </div>
-          <CardDescription>Manage your subscription and billing details</CardDescription>
+          <CardDescription>Your current Qimma subscription</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
@@ -98,222 +193,202 @@ export default function ClientSettingsPage() {
                 <Zap className="h-5 w-5 text-primary" />
               </div>
               <div>
-                <p className="text-sm font-medium text-foreground">Growth Plan</p>
-                <p className="text-xs text-muted-foreground">₹4,999/month</p>
+                <p className="font-medium">{PLAN_LABELS[org?.plan ?? "free"] ?? "Free"} plan</p>
+                <p className="text-xs text-muted-foreground">
+                  Contact us to change your plan
+                </p>
               </div>
             </div>
-            <Badge className="bg-accent-100 text-accent-700 border-accent-200">
-              Active
-            </Badge>
+            <Badge>Active</Badge>
           </div>
-
-          <div className="grid grid-cols-2 gap-4 rounded-lg border border-border p-4">
+          <div className="grid grid-cols-1 gap-4 rounded-lg border border-border p-4 text-sm sm:grid-cols-2">
             <div>
-              <p className="text-xs text-muted-foreground">Billing Interval</p>
-              <p className="text-sm font-medium text-foreground mt-1">Monthly</p>
+              <p className="text-xs text-muted-foreground">Business</p>
+              <p className="font-medium">{org?.name ?? "—"}</p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Next Billing</p>
-              <p className="text-sm font-medium text-foreground mt-1">July 2, 2026</p>
+              <p className="text-xs text-muted-foreground">City</p>
+              <p className="font-medium">{org?.city ?? "—"}</p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">GBP Posts</p>
-              <p className="text-sm font-medium text-foreground mt-1">8 / month</p>
+              <p className="text-xs text-muted-foreground">Category</p>
+              <p className="font-medium capitalize">{org?.category?.replace("_", " ") ?? "—"}</p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">WhatsApp AI</p>
-              <p className="text-sm font-medium text-foreground mt-1">Included</p>
+              <p className="text-xs text-muted-foreground">Exclusivity</p>
+              <p className="font-medium capitalize">{org?.exclusivity ?? "standard"}</p>
             </div>
           </div>
-
-          <div className="flex gap-3">
-            <Button variant="outline" size="sm">
-              <Crown className="h-4 w-4 mr-1.5" />
-              Upgrade Plan
+          <a href="mailto:hello@qimma.io?subject=Change%20Qimma%20plan">
+            <Button variant="outline" size="sm" className="min-h-11">
+              <Crown className="mr-2 h-4 w-4" />
+              Contact us to change plan
             </Button>
-            <Button variant="ghost" size="sm">
-              View Billing History
-            </Button>
-          </div>
+          </a>
         </CardContent>
       </Card>
 
-      {/* Notification Preferences */}
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
             <Bell className="h-5 w-5 text-primary" />
-            <CardTitle>Notification Preferences</CardTitle>
+            <CardTitle>Notifications</CardTitle>
           </div>
-          <CardDescription>Choose how and when you want to be notified</CardDescription>
+          <CardDescription>Choose what you want to be notified about</CardDescription>
         </CardHeader>
         <CardContent className="divide-y divide-border">
           <Toggle
             enabled={notifications.newLead}
-            onChange={() => toggleNotification("newLead")}
-            label="New Lead Alerts"
-            description="Get notified instantly when a new lead comes in via WhatsApp or GBP"
+            onChange={() => setNotifications((p) => ({ ...p, newLead: !p.newLead }))}
+            label="New lead alerts"
+            description="Instant alert when someone messages on WhatsApp"
           />
           <Toggle
             enabled={notifications.weeklySummary}
-            onChange={() => toggleNotification("weeklySummary")}
-            label="Weekly Summary"
-            description="A brief overview of your leads, rankings, and GBP performance every Monday"
+            onChange={() => setNotifications((p) => ({ ...p, weeklySummary: !p.weeklySummary }))}
+            label="Weekly summary"
+            description="Monday overview of leads and rankings"
           />
           <Toggle
             enabled={notifications.monthlyReport}
-            onChange={() => toggleNotification("monthlyReport")}
-            label="Monthly Value Report"
-            description="Detailed monthly report with leads, revenue, reviews, and recommendations"
+            onChange={() => setNotifications((p) => ({ ...p, monthlyReport: !p.monthlyReport }))}
+            label="Monthly report"
+            description="Value report delivered by the 5th of each month"
           />
           <Toggle
             enabled={notifications.marketingTips}
-            onChange={() => toggleNotification("marketingTips")}
-            label="Marketing Tips"
-            description="Occasional tips to improve your Google ranking and lead conversion"
+            onChange={() => setNotifications((p) => ({ ...p, marketingTips: !p.marketingTips }))}
+            label="Marketing tips"
+            description="Occasional tips to improve local SEO"
           />
+          <div className="pt-4">
+            <Button size="sm" onClick={handleSaveNotifications}>Save preferences</Button>
+          </div>
         </CardContent>
       </Card>
 
-      {/* Territory Settings */}
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
             <MapPin className="h-5 w-5 text-primary" />
-            <CardTitle>Territory Settings</CardTitle>
+            <CardTitle>Territory</CardTitle>
           </div>
-          <CardDescription>Your configured territory and exclusivity</CardDescription>
+          <CardDescription>Your local area and assigned keywords</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 gap-4 rounded-lg border border-border p-4">
-            <div>
-              <p className="text-xs text-muted-foreground">City</p>
-              <p className="text-sm font-medium text-foreground mt-1">Bangalore</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Category</p>
-              <p className="text-sm font-medium text-foreground mt-1">Dentist</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Radius</p>
-              <p className="text-sm font-medium text-foreground mt-1">5 km</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Exclusivity</p>
-              <Badge className="mt-1 bg-muted text-muted-foreground border-border">
-                Standard
-              </Badge>
-            </div>
-            <div className="col-span-2">
-              <p className="text-xs text-muted-foreground">Assigned Keywords</p>
-              <div className="flex flex-wrap gap-1.5 mt-1.5">
-                {[
-                  "dentist in Bangalore",
-                  "dental clinic",
-                  "root canal",
-                  "teeth whitening",
-                  "braces",
-                ].map((kw) => (
-                  <Badge key={kw} variant="outline" className="text-xs">
-                    {kw}
+          {onboarding?.is_complete ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 gap-4 rounded-lg border border-border p-4 text-sm sm:grid-cols-2">
+                <div>
+                  <p className="text-xs text-muted-foreground">City</p>
+                  <p className="font-medium">{org?.city ?? "—"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Category</p>
+                  <p className="font-medium capitalize">{org?.category?.replace("_", " ") ?? "—"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Exclusivity</p>
+                  <Badge variant="outline" className="mt-1 capitalize">
+                    {org?.exclusivity ?? "standard"}
                   </Badge>
-                ))}
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Status</p>
+                  <Badge variant="default" className="mt-1">Active</Badge>
+                </div>
               </div>
+              <p className="text-xs text-muted-foreground">
+                Keyword assignments are managed by growth agents. Run agents from the Growth page to refresh your local keyword niches.
+              </p>
+              <Link href="/client/growth">
+                <Button variant="outline" size="sm">View growth & keywords</Button>
+              </Link>
             </div>
-          </div>
-          <p className="text-xs text-muted-foreground mt-3">
-            Territory settings can only be modified by GlamAI support. Contact us to make changes.
-          </p>
+          ) : (
+            <div className="rounded-lg border border-dashed border-border p-6 text-center">
+              <p className="text-sm text-muted-foreground">No territory claimed yet.</p>
+              <Link href="/client/onboarding" className="mt-3 inline-block">
+                <Button size="sm">Set up territory</Button>
+              </Link>
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      {/* Connected Accounts */}
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
             <Link2 className="h-5 w-5 text-primary" />
-            <CardTitle>Connected Accounts</CardTitle>
+            <CardTitle>Connected accounts</CardTitle>
           </div>
-          <CardDescription>Manage your connected services</CardDescription>
+          <CardDescription>Services linked to your Qimma account</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {/* GBP */}
+        <CardContent className="space-y-3">
           <div className="flex items-center justify-between rounded-lg border border-border p-4">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success/10">
-                <CheckCircle2 className="h-5 w-5 text-success" />
+              <div className={`rounded-lg p-2 ${gbpConnected ? "bg-success/10" : "bg-muted"}`}>
+                {gbpConnected ? (
+                  <CheckCircle2 className="h-5 w-5 text-success" />
+                ) : (
+                  <XCircle className="h-5 w-5 text-muted-foreground" />
+                )}
               </div>
               <div>
-                <p className="text-sm font-medium text-foreground">
-                  Google Business Profile
-                </p>
+                <p className="text-sm font-medium">Google Business Profile</p>
                 <p className="text-xs text-muted-foreground">
-                  Connected · Last synced 2 hours ago
+                  {gbpConnected
+                    ? `Connected${gbpData?.data?.last_synced_at ? ` · ${formatRelativeTime(gbpData.data.last_synced_at)}` : ""}`
+                    : "Not connected"}
                 </p>
               </div>
             </div>
-            <Button variant="outline" size="sm">
-              Reconnect
+            <Button variant="outline" size="sm" onClick={handleReconnectGbp}>
+              {gbpConnected ? "Reconnect" : "Connect"}
             </Button>
           </div>
 
-          {/* WhatsApp */}
-          <div className="flex items-center justify-between rounded-lg border border-border p-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success/10">
-                <CheckCircle2 className="h-5 w-5 text-success" />
+          <div className="rounded-lg border border-border p-4 space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className={`rounded-lg p-2 ${whatsappConnected ? "bg-success/10" : "bg-muted"}`}>
+                  {whatsappConnected ? (
+                    <CheckCircle2 className="h-5 w-5 text-success" />
+                  ) : (
+                    <XCircle className="h-5 w-5 text-muted-foreground" />
+                  )}
+                </div>
+                <div>
+                  <p className="text-sm font-medium">WhatsApp Business</p>
+                  <p className="text-xs text-muted-foreground">
+                    {whatsappConnected ? "Number saved for lead routing" : "Optional — add anytime"}
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm font-medium text-foreground">WhatsApp Business</p>
-                <p className="text-xs text-muted-foreground">
-                  Connected · +91 98765 43210
-                </p>
-              </div>
             </div>
-            <Button variant="outline" size="sm">
-              Reconnect
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Danger Zone */}
-      <Card className="border-danger/30">
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-danger" />
-            <CardTitle className="text-danger">Danger Zone</CardTitle>
-          </div>
-          <CardDescription>
-            Irreversible actions — proceed with caution
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between rounded-lg border border-danger/20 bg-danger/5 p-4">
-            <div>
-              <p className="text-sm font-medium text-foreground">Pause Account</p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Temporarily stop all services. You can resume anytime.
-              </p>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <input
+                type="tel"
+                value={waPhone}
+                onChange={(e) => setWaPhone(e.target.value)}
+                placeholder="+91 98765 43210"
+                className="h-10 flex-1 rounded-md border border-border bg-background px-3 text-sm"
+              />
+              <Button variant="outline" size="sm" onClick={() => void handleSaveWhatsApp()} disabled={savingWa}>
+                {savingWa ? "Saving…" : "Save number"}
+              </Button>
             </div>
-            <Button variant="outline" size="sm" className="border-danger/30 text-danger hover:bg-danger/10">
-              <Pause className="h-4 w-4 mr-1.5" />
-              Pause Account
-            </Button>
           </div>
 
-          <div className="flex items-center justify-between rounded-lg border border-danger/20 bg-danger/5 p-4">
-            <div>
-              <p className="text-sm font-medium text-foreground">Cancel Account</p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Permanently delete your account and all data. This cannot be undone.
-              </p>
+          {health.length > 0 && (
+            <div className="flex flex-wrap gap-2 pt-2">
+              {health.map((c: { provider: string; status: string }) => (
+                <Badge key={c.provider} variant="outline" className="text-xs capitalize">
+                  {c.provider.replace("_", " ")} · {c.status}
+                </Badge>
+              ))}
             </div>
-            <Button variant="danger" size="sm">
-              <Trash2 className="h-4 w-4 mr-1.5" />
-              Cancel Account
-            </Button>
-          </div>
+          )}
         </CardContent>
       </Card>
     </div>

@@ -16,68 +16,13 @@ from src.integrations.anthropic import AnthropicConnector
 from src.core.config import get_settings
 from src.models.gbp import GbpPost, GbpPostType
 from src.models.org import Org
+from src.services.verticals import get_vertical
 
 logger = structlog.get_logger(__name__)
 
-
-# ── Post Templates by Type ───────────────────────────────────
-
-POST_TEMPLATES = {
-    "portfolio_showcase": {
-        "description": "Showcase a completed project",
-        "example": "✨ Just completed this stunning 3BHK transformation in Whitefield!\n\nFrom concept to completion in 45 days. Modern minimalist design with warm wood accents.\n\nThinking about your own space? Let's chat! 🏠\n\n#InteriorDesign #Bangalore #3BHK #ModernInterior",
-    },
-    "tip_educational": {
-        "description": "Share an interior design tip",
-        "example": "💡 Design Tip: Use mirrors strategically to make small spaces feel larger!\n\nA well-placed mirror can double the visual depth of a room and reflect natural light beautifully.\n\nSave this for your next project! 📌\n\n#DesignTips #InteriorDesign #SmallSpaces",
-    },
-    "seasonal": {
-        "description": "Seasonal/festival-themed post",
-        "example": "🪔 This Diwali, transform your home into a warm, inviting space!\n\nOur top 3 tips:\n1. Layer warm lighting\n2. Add festive textiles\n3. Create a welcoming entrance\n\nBook a consultation today!\n\n#DiwaliDecor #HomeDecor #Bangalore",
-    },
-    "testimonial": {
-        "description": "Client testimonial/review highlight",
-        "example": "⭐⭐⭐⭐⭐\n\n\"They understood our vision perfectly and delivered beyond expectations!\"\n— Happy Client, Indiranagar\n\nYour dream home is just a message away! 💬\n\n#ClientLove #InteriorDesign #Bangalore",
-    },
-    "behind_scenes": {
-        "description": "Behind the scenes of a project",
-        "example": "🔨 Behind the scenes: Custom carpentry for a modular kitchen in Koramangala!\n\nEvery detail matters. From material selection to final installation.\n\nFollow for more updates! 👀\n\n#ModularKitchen #BehindTheScenes #InteriorDesign",
-    },
-    "offer_promotion": {
-        "description": "Special offer or promotion",
-        "example": "🎉 LIMITED OFFER: Free consultation + 3D design for new clients this month!\n\nFirst 10 bookings only. Don't miss out!\n\nDM or call to book your slot! 📞\n\n#InteriorDesign #Bangalore #FreeConsultation",
-    },
-}
-
-# ── Keyword Banks by Vertical ────────────────────────────────
-
-INTERIOR_DESIGN_KEYWORDS = {
-    "primary": [
-        "interior designer",
-        "interior design",
-        "home interior",
-        "office interior",
-    ],
-    "location_based": [
-        "interior designer in {area}",
-        "best interior designer {city}",
-        "interior design company {area}",
-    ],
-    "service_based": [
-        "modular kitchen design",
-        "wardrobe design",
-        "home renovation",
-        "office interior design",
-        "3BHK interior",
-        "2BHK interior",
-    ],
-    "long_tail": [
-        "affordable interior designer {city}",
-        "luxury interior design {area}",
-        "modern interior designer",
-        "contemporary home design",
-    ],
-}
+# Backward-compatible alias
+INTERIOR_DESIGN_KEYWORDS = get_vertical("interior_design").keyword_bank
+POST_TEMPLATES = get_vertical("interior_design").post_templates
 
 
 class GbpPostGenerator:
@@ -117,30 +62,12 @@ class GbpPostGenerator:
                 - keyword_target: str — the primary keyword
                 - hashtags: list[str] — suggested hashtags
         """
-        template = POST_TEMPLATES.get(post_type, POST_TEMPLATES["portfolio_showcase"])
+        vertical = get_vertical(org.category.value)
+        template = vertical.post_templates.get(
+            post_type, vertical.post_templates.get("tip_educational", {"description": "", "example": ""})
+        )
 
-        system_prompt = f"""You are a Google Business Profile post writer for an interior design business in India.
-
-Write engaging, professional GBP posts that:
-- Are 150-300 words
-- Include the target keyword naturally (not stuffed)
-- Have a clear call-to-action
-- Use 3-5 relevant hashtags
-- Are conversational and warm
-- Follow GBP best practices
-
-Business details:
-- Name: {org.name}
-- City: {org.city}
-- Category: Interior Design
-
-Respond in JSON format:
-{{
-    "content": "the post text",
-    "title": "optional short title",
-    "hashtags": ["tag1", "tag2", "tag3"],
-    "call_to_action": "what action to suggest"
-}}"""
+        system_prompt = vertical.post_system_prompt(org.name, org.city or "Bangalore")
 
         keyword_instruction = ""
         if target_keyword:
@@ -189,12 +116,7 @@ Respond with JSON only."""
         Returns a list of post dicts, each with content, type, and
         suggested publish date.
         """
-        post_types = [
-            "portfolio_showcase",
-            "tip_educational",
-            "testimonial",
-            "seasonal",
-        ]
+        post_types = get_vertical(org.category.value).monthly_post_types
 
         keywords = self._get_keywords_for_org(org)
         posts = []
@@ -212,16 +134,10 @@ Respond with JSON only."""
         return posts
 
     def _get_keywords_for_org(self, org: Org) -> list[str]:
-        """Get target keywords for an org based on their location."""
+        """Get target keywords for an org based on vertical and location."""
         city = org.city or "Bangalore"
-        return [
-            f"interior designer in {city}",
-            f"best interior designer {city}",
-            "modular kitchen design",
-            "home interior design",
-            "3BHK interior design",
-            "office interior design",
-        ]
+        vertical = get_vertical(org.category.value)
+        return vertical.keyword_pool(city)[:6]
 
     @staticmethod
     def _get_week_date(month: int, year: int, week_index: int) -> str:

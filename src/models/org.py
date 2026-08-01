@@ -25,6 +25,7 @@ class BusinessCategory(str, enum.Enum):
     ARCHITECT = "architect"
     PHOTOGRAPHER = "photographer"
     RESTAURANT = "restaurant"
+    BAKERY = "bakery"
     OTHER = "other"
 
 

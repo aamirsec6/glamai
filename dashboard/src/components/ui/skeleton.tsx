@@ -10,7 +10,7 @@ const Skeleton = React.forwardRef<HTMLDivElement, SkeletonProps>(
     <div
       ref={ref}
       className={cn(
-        "animate-pulse rounded-md bg-gray-200",
+        "animate-pulse rounded-md bg-muted",
         className
       )}
       {...props}
@@ -21,7 +21,7 @@ Skeleton.displayName = "Skeleton";
 
 function SkeletonCard({ className }: { className?: string }) {
   return (
-    <div className={cn("rounded-card bg-card shadow-card border border-gray-100 p-6", className)}>
+    <div className={cn("rounded-card border border-border bg-card p-6 shadow-sm", className)}>
       <Skeleton className="h-4 w-1/3 mb-4" />
       <Skeleton className="h-8 w-2/3 mb-2" />
       <Skeleton className="h-4 w-1/2" />

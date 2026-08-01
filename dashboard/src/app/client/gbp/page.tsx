@@ -14,6 +14,7 @@ import ApiClient, {
   useGbpInsights,
   useGbpCompetitors,
   useIntegrationHealth,
+  useOrgDashboard,
 } from "@/lib/api";
 import { useOrgId } from "@/lib/org-context";
 import {
@@ -44,6 +45,10 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PostImage } from "@/components/post-image";
+import { ClientPageHeader } from "@/components/client/page-header";
+import { AlertBanner } from "@/components/client/alert-banner";
+import { OrgEmptyState } from "@/components/client/org-empty-state";
+import { ReviewQrCard } from "@/components/client/review-qr-card";
 
 function positionColor(pos?: number) {
   if (!pos) return "text-muted-foreground";
@@ -66,10 +71,12 @@ export default function ClientGbpPage() {
   const { orgId } = useOrgId();
   const [syncing, setSyncing] = React.useState(false);
   const [generating, setGenerating] = React.useState(false);
+  const [message, setMessage] = React.useState<{ type: "success" | "error"; text: string } | null>(null);
   const { data: postsData, isLoading: postsLoading, mutate: mutatePosts } = useGbpPosts(orgId || "");
   const { data: rankingsData, isLoading: rankingsLoading } =
     useGbpRankings(orgId || "");
   const { data: connectionData, mutate: mutateConnection } = useGbpConnection(orgId || "");
+  const { data: dashboardData } = useOrgDashboard(orgId || "");
   const { data: insightsData, mutate: mutateInsights } = useGbpInsights(orgId || "");
   const { data: healthData } = useIntegrationHealth(orgId || "");
   const { data: competitorsData, mutate: mutateCompetitors } = useGbpCompetitors(orgId || "");
@@ -86,14 +93,13 @@ export default function ClientGbpPage() {
   const handleSync = async () => {
     if (!orgId) return;
     setSyncing(true);
+    setMessage(null);
     try {
-      await ApiClient.syncGbp(orgId);
-      setTimeout(() => {
-        mutateConnection();
-        mutateInsights();
-        mutateCompetitors();
-        mutatePosts();
-      }, 3000);
+      await ApiClient.syncGbp(orgId, false);
+      setMessage({ type: "success", text: "Sync started — data will refresh shortly." });
+      await Promise.all([mutateConnection(), mutateInsights(), mutateCompetitors(), mutatePosts()]);
+    } catch (e) {
+      setMessage({ type: "error", text: e instanceof Error ? e.message : "Sync failed" });
     } finally {
       setSyncing(false);
     }
@@ -102,9 +108,13 @@ export default function ClientGbpPage() {
   const handleGeneratePosts = async () => {
     if (!orgId) return;
     setGenerating(true);
+    setMessage(null);
     try {
-      await ApiClient.generateGbpPosts(orgId);
-      setTimeout(() => mutatePosts(), 5000);
+      await ApiClient.generateGbpPosts(orgId, false);
+      setMessage({ type: "success", text: "Posts generated — refresh the list in a few seconds." });
+      setTimeout(() => mutatePosts(), 3000);
+    } catch (e) {
+      setMessage({ type: "error", text: e instanceof Error ? e.message : "Generation failed" });
     } finally {
       setGenerating(false);
     }
@@ -118,50 +128,51 @@ export default function ClientGbpPage() {
   const connected = connectionData?.data?.connected ?? false;
   const lastSync = connectionData?.data?.last_synced_at;
   const placeId = connectionData?.data?.place_id;
+  const gbpName = connectionData?.data?.gbp_name;
+  const org = dashboardData?.data?.org;
   const insights = insightsData?.data;
   const competitors: GbpCompetitor[] = competitorsData?.data ?? [];
   const posts: GbpPost[] = postsData?.data ?? [];
   const rankings: GbpRanking[] = rankingsData?.data ?? [];
   const isLoading = postsLoading || rankingsLoading;
 
+  if (!orgId) {
+    return (
+      <div className="py-8">
+        <OrgEmptyState />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">
-            Google Business Profile
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Insights, posts, and local SEO performance
-          </p>
-        </div>
-        <div className="flex gap-2">
-          {!connected && orgId && (
-            <Button size="sm" onClick={handleConnect}>
-              Connect Google
+      <ClientPageHeader
+        title="Google Business Profile"
+        description="Monitor visibility, manage posts, and track local keyword rankings."
+        actions={
+          <div className="flex flex-wrap gap-2">
+            {!connected && (
+              <Button size="sm" onClick={handleConnect}>Connect Google</Button>
+            )}
+            <Button variant="outline" size="sm" onClick={handleGeneratePosts} disabled={generating}>
+              <Sparkles className="mr-2 h-4 w-4" />
+              {generating ? "Generating…" : "Generate posts"}
             </Button>
-          )}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleGeneratePosts}
-            disabled={!orgId || generating}
-          >
-            <Sparkles className="mr-2 h-4 w-4" />
-            {generating ? "Generating…" : "Generate Posts"}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleSync}
-            disabled={!orgId || syncing}
-          >
-            <RefreshCw className={cn("mr-2 h-4 w-4", syncing && "animate-spin")} />
-            {syncing ? "Syncing…" : "Sync Now"}
-          </Button>
-        </div>
-      </div>
+            <Button variant="outline" size="sm" onClick={handleSync} disabled={syncing}>
+              <RefreshCw className={cn("mr-2 h-4 w-4", syncing && "animate-spin")} />
+              {syncing ? "Syncing…" : "Sync now"}
+            </Button>
+          </div>
+        }
+      />
+
+      {message && (
+        <AlertBanner
+          variant={message.type}
+          message={message.text}
+          onDismiss={() => setMessage(null)}
+        />
+      )}
 
       {/* Connection Status */}
       <Card>
@@ -196,6 +207,14 @@ export default function ClientGbpPage() {
           </div>
         </CardContent>
       </Card>
+
+      <ReviewQrCard
+        businessName={gbpName || org?.name || "Your business"}
+        placeId={placeId}
+        connected={connected}
+        subtitle={org?.city ? `${org.city}${org.category ? ` · ${org.category.replace(/_/g, " ")}` : ""}` : undefined}
+        onConnect={handleConnect}
+      />
 
       {/* Connector health */}
       {connectorHealth.length > 0 && (
@@ -408,7 +427,7 @@ export default function ClientGbpPage() {
                     </p>
                     {comp.is_glamai_client && (
                       <Badge variant="info" className="text-xs shrink-0 ml-2">
-                        GlamAI
+                        Qimma
                       </Badge>
                     )}
                   </div>

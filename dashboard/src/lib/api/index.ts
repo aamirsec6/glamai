@@ -4,6 +4,7 @@ import * as gbp from "./gbp";
 import * as leads from "./leads";
 import * as misc from "./misc";
 import * as orgs from "./orgs";
+import * as seo from "./seo";
 
 export * from "./hooks";
 export * from "./types";
@@ -20,6 +21,10 @@ class ApiClient {
   static sendOrgMessage = orgs.sendOrgMessage;
   static createOrg = orgs.createOrg;
   static updateOrg = orgs.updateOrg;
+  static geocodeOrg = orgs.geocodeOrg;
+  static getOrgSetup = orgs.getOrgSetup;
+  static completeOnboarding = orgs.completeOnboarding;
+  static listMyOrgs = orgs.listMyOrgs;
   static getOrgDashboard = orgs.getOrgDashboard;
 
   // ── Leads ──
@@ -31,6 +36,10 @@ class ApiClient {
   // ── GBP ──
 
   static getGbpConnection = gbp.getGbpConnection;
+  static getGbpLocations = gbp.getGbpLocations;
+  static selectGbpLocation = gbp.selectGbpLocation;
+  static searchGbpPlaces = gbp.searchGbpPlaces;
+  static linkGbpPlace = gbp.linkGbpPlace;
   static getGbpInsights = gbp.getGbpInsights;
   static getGbpOAuthUrl = gbp.getGbpOAuthUrl;
   static getGbpPosts = gbp.getGbpPosts;
@@ -55,6 +64,14 @@ class ApiClient {
   static syncLiveAnalysis = analytics.syncLiveAnalysis;
   static runContentAgents = analytics.runContentAgents;
   static runAnalysisAndContent = analytics.runAnalysisAndContent;
+
+  // ── Growth / SEO ──
+
+  static getSeoScorecard = seo.getSeoScorecard;
+  static runSeoAgent = seo.runSeoAgent;
+  static runGeoAgent = seo.runGeoAgent;
+  static runGrowthAgents = seo.runGrowthAgents;
+  static getLastGrowthRun = seo.getLastGrowthRun;
 
   // ── Misc ──
 

@@ -19,10 +19,10 @@ const sizeClasses = {
 };
 
 const variantClasses = {
-  default: "bg-primary-500",
-  success: "bg-success-500",
-  warning: "bg-warning-500",
-  danger: "bg-danger-500",
+  default: "bg-primary",
+  success: "bg-success",
+  warning: "bg-warning",
+  danger: "bg-danger",
 };
 
 const Progress = React.forwardRef<HTMLDivElement, ProgressProps>(
@@ -44,14 +44,14 @@ const Progress = React.forwardRef<HTMLDivElement, ProgressProps>(
     return (
       <div ref={ref} className={cn("w-full", className)} {...props}>
         {showLabel && (
-          <div className="mb-1 flex justify-between text-xs text-muted">
+          <div className="mb-1 flex justify-between text-xs text-muted-foreground">
             <span>Progress</span>
             <span>{Math.round(percentage)}%</span>
           </div>
         )}
         <div
           className={cn(
-            "w-full overflow-hidden rounded-full bg-gray-200",
+            "w-full overflow-hidden rounded-full bg-muted",
             sizeClasses[size]
           )}
         >

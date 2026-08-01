@@ -19,7 +19,7 @@ export default function ContactPage() {
       <PageHero
         eyebrow="Contact"
         title="Let's talk about growing your business"
-        description="Book a demo, ask about pricing, or tell us about your studio. We typically respond within one business day."
+        description="Book a demo, ask about pricing, or tell us about your business. We typically respond within one business day."
       />
 
       <section className="mkt-section">
@@ -28,23 +28,23 @@ export default function ContactPage() {
             <div>
               <h2 className="mkt-heading text-xl">Get in touch</h2>
               <p className="mkt-body mt-2">
-                Whether you&apos;re an interior designer in Bangalore or expanding to new cities — we&apos;d love to hear from you.
+                Whether you&apos;re a salon in Dubai or a studio in Bangalore — we&apos;d love to hear from you.
               </p>
             </div>
             <ul className="space-y-4">
-              <li className="flex gap-3 text-sm text-zinc-300">
-                <Mail className="h-5 w-5 shrink-0 text-[#d4af37]" />
+              <li className="flex gap-3 text-sm text-zinc-400">
+                <Mail className="h-5 w-5 shrink-0 text-cyan-400" />
                 <a href={`mailto:${SITE.email}`} className="mkt-link">
                   {SITE.email}
                 </a>
               </li>
-              <li className="flex gap-3 text-sm text-zinc-300">
-                <Phone className="h-5 w-5 shrink-0 text-[#d4af37]" />
+              <li className="flex gap-3 text-sm text-zinc-400">
+                <Phone className="h-5 w-5 shrink-0 text-cyan-400" />
                 {SITE.phone}
               </li>
-              <li className="flex gap-3 text-sm text-zinc-300">
-                <MapPin className="h-5 w-5 shrink-0 text-[#d4af37]" />
-                Bangalore, India · Serving local businesses nationwide
+              <li className="flex gap-3 text-sm text-zinc-400">
+                <MapPin className="h-5 w-5 shrink-0 text-cyan-400" />
+                Bangalore, India · Serving local businesses worldwide
               </li>
             </ul>
           </div>
@@ -52,7 +52,7 @@ export default function ContactPage() {
           <div className="lg:col-span-3">
             {sent ? (
               <div className="mkt-card flex flex-col items-center justify-center p-12 text-center">
-                <CheckCircle2 className="h-14 w-14 text-[#c9a962]" />
+                <CheckCircle2 className="h-14 w-14 text-cyan-400" />
                 <h3 className="mkt-heading mt-4 text-xl">Message received</h3>
                 <p className="mkt-body mt-2">
                   Thanks, {form.name || "there"}! We&apos;ll reach out at {form.email || "your email"} soon.

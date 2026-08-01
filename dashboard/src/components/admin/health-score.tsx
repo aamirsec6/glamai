@@ -45,7 +45,7 @@ export function HealthScore({ health, isLoading, orgName }: HealthScoreProps) {
           <CardTitle>Health Score</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-muted">No health data available</p>
+          <p className="text-muted-foreground">No health data available</p>
         </CardContent>
       </Card>
     );
@@ -60,7 +60,7 @@ export function HealthScore({ health, isLoading, orgName }: HealthScoreProps) {
     <Card>
       <CardHeader>
         <CardTitle>Health Score</CardTitle>
-        {orgName && <p className="text-sm text-muted">{orgName}</p>}
+        {orgName && <p className="text-sm text-muted-foreground">{orgName}</p>}
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Score circle */}
@@ -72,7 +72,7 @@ export function HealthScore({ health, isLoading, orgName }: HealthScoreProps) {
                 cy="50"
                 r="42"
                 fill="none"
-                stroke="#e2e8f0"
+                className="stroke-border"
                 strokeWidth="8"
               />
               <circle
@@ -91,17 +91,17 @@ export function HealthScore({ health, isLoading, orgName }: HealthScoreProps) {
               <span className={cn("text-3xl font-bold", colorClass)}>
                 {score}
               </span>
-              <span className="text-xs text-muted">/100</span>
+              <span className="text-xs text-muted-foreground">/100</span>
             </div>
           </div>
           <span
             className={cn(
               "mt-2 rounded-badge px-3 py-1 text-sm font-medium",
               score >= 80
-                ? "bg-success-50 text-success-600"
+                ? "bg-success/15 text-foreground border border-success/30"
                 : score >= 50
-                ? "bg-warning-50 text-warning-600"
-                : "bg-danger-50 text-danger-600"
+                ? "bg-warning/15 text-foreground border border-warning/30"
+                : "bg-danger/15 text-foreground border border-danger/30"
             )}
           >
             {label}
@@ -120,7 +120,7 @@ export function HealthScore({ health, isLoading, orgName }: HealthScoreProps) {
         {/* Factors */}
         {(health.factors?.length ?? 0) > 0 && (
           <div className="space-y-2">
-            <h4 className="text-sm font-medium text-text">Factors</h4>
+            <h4 className="text-sm font-medium text-foreground">Factors</h4>
             <div className="space-y-2">
               {health.factors!.map((factor, idx) => (
                 <div
@@ -137,9 +137,9 @@ export function HealthScore({ health, isLoading, orgName }: HealthScoreProps) {
                     <Info className="mt-0.5 h-4 w-4 shrink-0 text-info-500" />
                   )}
                   <div>
-                    <p className="text-sm text-text">{factor.label}</p>
+                    <p className="text-sm text-foreground">{factor.label}</p>
                     {factor.detail && (
-                      <p className="text-xs text-muted">{factor.detail}</p>
+                      <p className="text-xs text-muted-foreground">{factor.detail}</p>
                     )}
                   </div>
                 </div>
@@ -151,21 +151,21 @@ export function HealthScore({ health, isLoading, orgName }: HealthScoreProps) {
         {/* Quick stats */}
         <div className="grid grid-cols-2 gap-3">
           <div className="rounded-badge bg-gray-50 p-3">
-            <p className="text-xs text-muted">Last Login</p>
-            <p className="text-sm font-medium text-text">
+            <p className="text-xs text-muted-foreground">Last Login</p>
+            <p className="text-sm font-medium text-foreground">
               {health.last_login_days_ago === 0
                 ? "Today"
                 : `${health.last_login_days_ago ?? 0}d ago`}
             </p>
           </div>
           <div className="rounded-badge bg-gray-50 p-3">
-            <p className="text-xs text-muted">Onboarding</p>
-            <p className="text-sm font-medium text-text capitalize">
+            <p className="text-xs text-muted-foreground">Onboarding</p>
+            <p className="text-sm font-medium text-foreground capitalize">
               {(health.onboarding_step ?? "unknown").replace("_", " ")}
             </p>
           </div>
           <div className="rounded-badge bg-gray-50 p-3">
-            <p className="text-xs text-muted">GBP Sync</p>
+            <p className="text-xs text-muted-foreground">GBP Sync</p>
             <p
               className={cn(
                 "text-sm font-medium capitalize",
@@ -180,7 +180,7 @@ export function HealthScore({ health, isLoading, orgName }: HealthScoreProps) {
             </p>
           </div>
           <div className="rounded-badge bg-gray-50 p-3">
-            <p className="text-xs text-muted">WhatsApp</p>
+            <p className="text-xs text-muted-foreground">WhatsApp</p>
             <p
               className={cn(
                 "text-sm font-medium capitalize",

@@ -14,7 +14,7 @@ from src.integrations.base import ConnectorResource
 from src.integrations.registry import ConnectorRegistry
 from src.models.gbp import GbpProfileSnapshot
 from src.models.org import Org
-from src.services.gbp.optimizer import INTERIOR_DESIGN_KEYWORDS
+from src.services.verticals import get_vertical
 
 logger = structlog.get_logger(__name__)
 
@@ -83,13 +83,12 @@ class GbpProfileOptimizer:
             result = await self.session.execute(stmt)
             snapshot = result.scalar_one()
 
-        keywords = list(INTERIOR_DESIGN_KEYWORDS.get("primary", []))
-        if org.category.value != "interior_design":
-            keywords = [org.category.value.replace("_", " "), f"{org.category.value} {org.city}"]
+        vertical = get_vertical(org.category.value)
+        keywords = vertical.keyword_pool(org.city or "Bangalore")[:6]
 
         system = (
             f"You optimize Google Business Profile content for {org.name} "
-            f"({org.category.value}, {org.city}, India). "
+            f"({vertical.display_name}, {org.city}, India). "
             "Return JSON only with keys: optimized_description (max 750 chars), "
             "services (array of 5-8 service strings), keywords (array), "
             "optimization_score (0-100), suggestions (array of short strings)."

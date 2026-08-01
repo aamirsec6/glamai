@@ -51,7 +51,7 @@ export function FunnelChart({ data, isLoading }: FunnelChartProps) {
           <CardTitle>Onboarding Funnel</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex h-64 items-center justify-center text-muted">
+          <div className="flex h-64 items-center justify-center text-muted-foreground">
             No funnel data available
           </div>
         </CardContent>
@@ -69,7 +69,7 @@ export function FunnelChart({ data, isLoading }: FunnelChartProps) {
     <Card>
       <CardHeader>
         <CardTitle>Onboarding Funnel</CardTitle>
-        <p className="text-sm text-muted">
+        <p className="text-sm text-muted-foreground">
           Signup → GBP Connected → WhatsApp → Territory → Active → First Lead
         </p>
       </CardHeader>
@@ -128,7 +128,7 @@ export function FunnelChart({ data, isLoading }: FunnelChartProps) {
                 className="h-2 w-2 rounded-full"
                 style={{ backgroundColor: COLORS[idx] }}
               />
-              <span className="text-muted">{step.label}:</span>
+              <span className="text-muted-foreground">{step.label}:</span>
               <span
                 className={
                   step.conversion_pct >= 70

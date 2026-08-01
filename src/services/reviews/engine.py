@@ -18,6 +18,7 @@ from src.models.notification import NotificationChannel, NotificationLog, Notifi
 from src.models.org import Org
 from src.models.review import GbpReview, ReviewReplyStatus, ReviewRequest
 from src.services.ai.review_responder import ReviewResponder
+from src.services.reviews.links import build_gbp_review_url
 from src.services.whatsapp.templates import get_review_request_message
 
 logger = structlog.get_logger(__name__)
@@ -112,7 +113,7 @@ class ReviewEngine:
         if lead.status != LeadStatus.WON:
             return {"status": "lead_not_won"}
 
-        review_link = f"https://search.google.com/local/writereview?placeid={org.gbp_place_id}" if org.gbp_place_id else None
+        review_link = build_gbp_review_url(org.gbp_place_id)
         message = get_review_request_message(org.name, lead.contact_name, review_link)
 
         wa = self.registry.whatsapp()

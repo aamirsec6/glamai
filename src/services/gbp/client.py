@@ -380,3 +380,69 @@ class GbpClient:
         )
         response.raise_for_status()
         return response.json().get("places", [])
+
+    async def search_places_text(
+        self,
+        place_api_key: str,
+        query: str,
+        *,
+        latitude: float | None = None,
+        longitude: float | None = None,
+        radius_meters: int = 15000,
+        included_type: str | None = None,
+        max_results: int = 8,
+    ) -> list[dict[str, Any]]:
+        """Text search for businesses (Places API New) — no OAuth required."""
+        body: dict[str, Any] = {
+            "textQuery": query,
+            "maxResultCount": max_results,
+            "languageCode": "en",
+        }
+        if included_type:
+            body["includedType"] = included_type
+        if latitude is not None and longitude is not None:
+            body["locationBias"] = {
+                "circle": {
+                    "center": {"latitude": latitude, "longitude": longitude},
+                    "radius": float(radius_meters),
+                }
+            }
+
+        response = await self._client.post(
+            "https://places.googleapis.com/v1/places:searchText",
+            headers={
+                "X-Goog-Api-Key": place_api_key,
+                "X-Goog-FieldMask": (
+                    "places.id,places.displayName,places.formattedAddress,"
+                    "places.rating,places.userRatingCount,places.location,"
+                    "places.googleMapsUri,places.types,places.nationalPhoneNumber,"
+                    "places.websiteUri"
+                ),
+            },
+            json=body,
+        )
+        response.raise_for_status()
+        return response.json().get("places", [])
+
+    async def get_place_details(
+        self,
+        place_api_key: str,
+        place_id: str,
+    ) -> dict[str, Any]:
+        """Fetch full public place details + reviews (Places API New)."""
+        pid = place_id if place_id.startswith("places/") else f"places/{place_id}"
+        response = await self._client.get(
+            f"https://places.googleapis.com/v1/{pid}",
+            headers={
+                "X-Goog-Api-Key": place_api_key,
+                "X-Goog-FieldMask": (
+                    "id,displayName,formattedAddress,shortFormattedAddress,"
+                    "rating,userRatingCount,location,googleMapsUri,types,"
+                    "nationalPhoneNumber,internationalPhoneNumber,websiteUri,"
+                    "regularOpeningHours,editorialSummary,reviews,photos,"
+                    "businessStatus,primaryType,primaryTypeDisplayName"
+                ),
+            },
+        )
+        response.raise_for_status()
+        return response.json()

@@ -23,37 +23,37 @@ const StatCard = React.forwardRef<HTMLDivElement, StatCardProps>(
         <CardContent className="p-6">
           <div className="flex items-start justify-between">
             <div className="space-y-2">
-              <p className="text-sm font-medium text-muted">{label}</p>
-              <p className="text-2xl font-bold text-text">{value}</p>
+              <p className="text-sm font-medium text-muted-foreground">{label}</p>
+              <p className="text-2xl font-bold text-foreground">{value}</p>
               {change !== undefined && (
                 <div className="flex items-center gap-1 text-sm">
                   {isPositive && (
-                    <svg className="h-4 w-4 text-success-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="h-4 w-4 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
                     </svg>
                   )}
                   {isNegative && (
-                    <svg className="h-4 w-4 text-danger-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="h-4 w-4 text-danger" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
                     </svg>
                   )}
                   <span
                     className={cn(
                       "font-medium",
-                      isPositive && "text-success-500",
-                      isNegative && "text-danger-500",
-                      !isPositive && !isNegative && "text-muted"
+                      isPositive && "text-success",
+                      isNegative && "text-danger",
+                      !isPositive && !isNegative && "text-muted-foreground"
                     )}
                   >
                     {isPositive ? "+" : ""}
                     {change}%
                   </span>
-                  <span className="text-muted">vs last month</span>
+                  <span className="text-muted-foreground">vs last month</span>
                 </div>
               )}
             </div>
             {icon && (
-              <div className="rounded-lg bg-primary-50 p-3 text-primary-500">
+              <div className="rounded-lg bg-primary/10 p-3 text-primary">
                 {icon}
               </div>
             )}

@@ -20,6 +20,9 @@ celery_app = Celery(
         "src.workers.marketing_tasks",
         "src.workers.review_tasks",
         "src.workers.agent_tasks",
+        "src.workers.seo_tasks",
+        "src.workers.geo_tasks",
+        "src.workers.growth_tasks",
     ],
 )
 
@@ -39,10 +42,9 @@ celery_app.conf.update(
             "task": "src.workers.gbp_tasks.publish_scheduled_posts",
             "schedule": crontab(minute="*/15"),  # Every 15 min
         },
-        "generate-weekly-posts": {
-            "task": "src.workers.gbp_tasks.generate_weekly_posts",
-            "schedule": crontab(day_of_week=1, hour=9, minute=0),  # Monday 9 AM
-        },
+        # Weekly GBP post generation is owned by Growth (geo → SEO → content).
+        # Kept off the Monday beat to avoid double-posting with growth content.
+
         "sync-gbp-insights": {
             "task": "src.workers.gbp_tasks.sync_gbp_insights",
             "schedule": crontab(hour=6, minute=0),
@@ -92,11 +94,14 @@ celery_app.conf.update(
             "task": "src.workers.gbp_tasks.optimize_all_profiles",
             "schedule": crontab(day_of_week=2, hour=8, minute=0),
         },
-        # ── Content Agents (posts + profile + reviews + analysis) ──
-        "run-weekly-content-agents": {
-            "task": "src.workers.agent_tasks.run_content_agents_all_orgs",
-            "schedule": crontab(day_of_week=1, hour=10, minute=0),
+        # ── Growth Stack (single Monday owner: geo → SEO → content → reviews) ──
+        "run-weekly-growth-agents": {
+            "task": "src.workers.growth_tasks.run_growth_agents_all_orgs",
+            "schedule": crontab(day_of_week=1, hour=6, minute=30),
         },
+        # Standalone SEO track / content / weekly GBP posts removed from Monday
+        # beat — GrowthOrchestrator owns that work to prevent duplicate posts.
+
     },
 )
 

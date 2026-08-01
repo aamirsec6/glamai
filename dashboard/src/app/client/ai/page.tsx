@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PostImage } from "@/components/post-image";
+import { ClientPageHeader } from "@/components/client/page-header";
 import {
   Sparkles,
   BarChart3,
@@ -162,12 +163,12 @@ export default function ClientAiPage() {
     return (
       <div className="mx-auto max-w-lg space-y-4 py-12 text-center">
         <Sparkles className="mx-auto h-12 w-12 text-primary" />
-        <h2 className="text-2xl font-bold text-foreground">AI Agents</h2>
-        <p className="text-sm text-muted-foreground">
-          Load the demo account to run autonomous marketing agents — posts, profile, reviews, and
-          analysis.
-        </p>
-        <Button onClick={handleSeedDemo} disabled={seeding}>
+        <ClientPageHeader
+          title="AI Content"
+          description="Load the demo account to run autonomous marketing agents — posts, profile, reviews, and analysis."
+          className="border-0 pb-0"
+        />
+        <Button onClick={handleSeedDemo} disabled={seeding} className="min-h-11">
           {seeding ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -186,51 +187,49 @@ export default function ClientAiPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-foreground">AI Agents</h2>
-          <p className="text-sm text-muted-foreground">
-            Autonomous agents create GBP posts, optimize your profile, reply to reviews, and analyze
-            performance.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => refreshAnalytics()} disabled={isLoading}>
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Refresh
-          </Button>
-          <Button
-            variant="outline"
-            onClick={handleGenerateImagePost}
-            disabled={generatingImage || running}
-          >
-            {generatingImage ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Creating image…
-              </>
-            ) : (
-              <>
-                <ImageIcon className="mr-2 h-4 w-4" />
-                Image Post
-              </>
-            )}
-          </Button>
-          <Button onClick={handleRunAgents} disabled={running || generatingImage}>
-            {running ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Running agents…
-              </>
-            ) : (
-              <>
-                <Sparkles className="mr-2 h-4 w-4" />
-                Run All Agents
-              </>
-            )}
-          </Button>
-        </div>
-      </div>
+      <ClientPageHeader
+        title="AI Content"
+        description="Create GBP posts, optimize your profile, reply to reviews, and analyze performance."
+        actions={
+          <>
+            <Button variant="outline" onClick={() => refreshAnalytics()} disabled={isLoading} className="min-h-11">
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Refresh
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleGenerateImagePost}
+              disabled={generatingImage || running}
+              className="min-h-11"
+            >
+              {generatingImage ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Creating image…
+                </>
+              ) : (
+                <>
+                  <ImageIcon className="mr-2 h-4 w-4" />
+                  Image Post
+                </>
+              )}
+            </Button>
+            <Button onClick={handleRunAgents} disabled={running || generatingImage} className="min-h-11">
+              {running ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Running agents…
+                </>
+              ) : (
+                <>
+                  <Sparkles className="mr-2 h-4 w-4" />
+                  Run All Agents
+                </>
+              )}
+            </Button>
+          </>
+        }
+      />
 
       {error && (
         <Card className="border-destructive/30 bg-destructive/5">

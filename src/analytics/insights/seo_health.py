@@ -8,14 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.analytics.insights.types import SeoHealthInsights
 from src.models.gbp import GbpRanking
 from src.models.org import Org
-
-TARGET_KEYWORDS = [
-    "interior designer in {city}",
-    "best interior designer {city}",
-    "modular kitchen {city}",
-    "home interior design {city}",
-    "3BHK interior design",
-]
+from src.services.verticals import get_vertical
 
 
 class LocalSeoHealthModel:
@@ -28,6 +21,8 @@ class LocalSeoHealthModel:
         seo = SeoHealthInsights()
         org = await self.session.get(Org, org_id)
         city = org.city if org else "Bangalore"
+        category = org.category.value if org else "other"
+        target_keywords = get_vertical(category).seo_gap_templates(city)
 
         rankings = (
             await self.session.execute(
@@ -46,12 +41,12 @@ class LocalSeoHealthModel:
             )
 
         tracked_kws = {r.keyword.lower() for r in rankings}
-        for template in TARGET_KEYWORDS:
-            kw = template.format(city=city).lower()
+        for template in target_keywords:
+            kw = template.lower()
             if kw not in tracked_kws:
                 matching = any(kw in t for t in tracked_kws)
                 if not matching:
-                    seo.keyword_gaps.append(template.format(city=city))
+                    seo.keyword_gaps.append(template)
 
         top3 = sum(1 for p in positions if p <= 3)
         if top3 >= 2:

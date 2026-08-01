@@ -4,12 +4,12 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 
 const badgeVariants = {
-  default: "bg-gray-100 text-gray-700 border-gray-200",
-  success: "bg-success-50 text-success-600 border-success-500/20",
-  warning: "bg-warning-50 text-warning-600 border-warning-500/20",
-  danger: "bg-danger-50 text-danger-600 border-danger-500/20",
-  info: "bg-info-50 text-info-600 border-info-500/20",
-  outline: "bg-transparent text-muted border-gray-300",
+  default: "bg-muted text-foreground border-border",
+  success: "bg-success/15 text-foreground border-success/30",
+  warning: "bg-warning/15 text-foreground border-warning/30",
+  danger: "bg-danger/15 text-foreground border-danger/30",
+  info: "bg-info/15 text-foreground border-info/30",
+  outline: "bg-muted/60 text-foreground border-border font-semibold",
 };
 
 export interface BadgeProps

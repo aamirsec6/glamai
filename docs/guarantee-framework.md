@@ -38,6 +38,18 @@ Promise too little → no one signs up.
 | Leads | "We generate and qualify leads via GBP + WhatsApp" | "You'll get 30 leads/month" |
 | Reviews | "We request reviews after every project" | "You'll get 8 reviews in 60 days" |
 
+### Path to Top 3 Scorecard (Growth Agents)
+
+The weekly **Path to Top 3** scorecard (`GET /api/v1/agents/seo/scorecard`) tracks:
+
+- Map Pack positions per assigned keyword
+- Week-over-week position delta
+- Recommended SEO actions (GBP posts, profile refresh)
+
+This is an **effort guarantee** — GlamAI commits to optimization work (posts, profile, keyword targeting). It does **not** guarantee specific rankings, which depend on competitors, Google algorithm changes, and the client's existing authority.
+
+See `docs/growth-agents.md` for agent architecture and `SERPAPI_KEY` setup.
+
 ## Guarantee Tiers by Plan
 
 ### Starter (₹1,999/mo)

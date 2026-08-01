@@ -6,8 +6,8 @@ import { cn } from "@/lib/utils";
 
 const FAQS = [
   {
-    q: "What is GlamAI, and how does it benefit my business?",
-    a: "GlamAI is an AI marketing team for local businesses. It optimizes your Google Business Profile, qualifies leads on WhatsApp, collects reviews, and sends monthly growth reports — so you get more customers with less manual work.",
+    q: "What is Qimma, and how does it benefit my business?",
+    a: "Qimma is an AI marketing team for local businesses. It optimizes your Google Business Profile, qualifies leads on WhatsApp, collects reviews, and sends monthly growth reports — so you get more customers with less manual work.",
   },
   {
     q: "How secure is my customer data?",
@@ -41,7 +41,7 @@ export function FaqSection() {
           <p className="mkt-eyebrow">FAQ</p>
           <h2 className="mkt-heading mt-4 text-3xl sm:text-4xl">
             Got questions?
-            <span className="mt-1 block landing-highlight-hero">We&apos;ve got answers.</span>
+            <span className="mt-1 block mkt-gradient-text">We&apos;ve got answers.</span>
           </h2>
         </div>
 
@@ -58,8 +58,8 @@ export function FaqSection() {
                   <span className="font-semibold text-white">{faq.q}</span>
                   <ChevronDown
                     className={cn(
-                      "h-5 w-5 shrink-0 text-zinc-500 transition-transform",
-                      isOpen && "rotate-180"
+                      "h-5 w-5 shrink-0 text-neutral-400 transition-transform",
+                      isOpen && "rotate-180",
                     )}
                   />
                 </button>

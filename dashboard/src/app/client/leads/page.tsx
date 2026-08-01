@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
+import { ClientPageHeader } from "@/components/client/page-header";
+import { OrgEmptyState } from "@/components/client/org-empty-state";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { formatCurrency, formatRelativeTime, getBudgetLabel, getScopeLabel, cn } from "@/lib/utils";
 import type { Lead } from "@/types";
@@ -53,11 +55,11 @@ function LeadRow({ lead, orgId }: { lead: Lead; orgId: string }) {
             </p>
           </div>
         </div>
-        <div className="hidden sm:block w-24"><StatusBadge status={status} /></div>
-        <p className="hidden md:block text-sm text-foreground w-24 truncate">
+        <div className="shrink-0"><StatusBadge status={status} /></div>
+        <p className="hidden md:block w-24 truncate text-sm text-foreground">
           {lead.budget_range ? getBudgetLabel(lead.budget_range) : "—"}
         </p>
-        <p className="hidden lg:block text-sm text-foreground w-24 truncate">
+        <p className="hidden lg:block w-24 truncate text-sm text-foreground">
           {lead.scope ? getScopeLabel(lead.scope) : "—"}
         </p>
         <div className="hidden md:block w-20">
@@ -65,7 +67,7 @@ function LeadRow({ lead, orgId }: { lead: Lead; orgId: string }) {
             ? <Badge variant={scoreVariant(score)} className="text-xs"><Sparkles className="mr-1 h-3 w-3" />{score}</Badge>
             : <span className="text-xs text-muted-foreground">—</span>}
         </div>
-        <span className="hidden lg:block text-xs text-muted-foreground w-24 truncate">
+        <span className="hidden w-24 truncate text-xs text-muted-foreground lg:block">
           {formatRelativeTime(lead.created_at)}
         </span>
         <div className="w-6 shrink-0">
@@ -74,7 +76,7 @@ function LeadRow({ lead, orgId }: { lead: Lead; orgId: string }) {
       </div>
 
       {/* Badges */}
-      <div className="flex flex-wrap gap-1.5 border-t border-border px-4 py-2 bg-muted/10">
+      <div className="flex flex-wrap gap-1.5 border-t border-border bg-muted/10 px-4 py-2">
         {lead.budget_range && <Badge variant="outline" className="text-xs"><IndianRupee className="mr-1 h-3 w-3" />{getBudgetLabel(lead.budget_range)}</Badge>}
         {lead.scope && <Badge variant="outline" className="text-xs">{getScopeLabel(lead.scope)}</Badge>}
         {lead.timeline && <Badge variant="outline" className="text-xs"><Clock className="mr-1 h-3 w-3" />{lead.timeline}</Badge>}
@@ -137,22 +139,34 @@ export default function ClientLeadsPage() {
     return l.contact_name.toLowerCase().includes(q) || l.contact_phone.includes(q);
   });
 
+  if (!orgId) {
+    return (
+      <div className="py-8">
+        <OrgEmptyState title="Leads" description="Connect a business to manage incoming inquiries." />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Leads</h1>
-          <p className="text-sm text-muted-foreground">Manage and track your incoming leads</p>
-        </div>
-        <span className="text-sm text-muted-foreground">{filtered.length} lead{filtered.length !== 1 ? "s" : ""}</span>
-      </div>
+      <ClientPageHeader
+        title="Leads"
+        description={`${filtered.length} lead${filtered.length !== 1 ? "s" : ""} in your pipeline — update status as you work each inquiry.`}
+      />
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-        <div className="flex flex-wrap gap-1 rounded-lg border border-border bg-muted/30 p-1">
+        <div className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1 [scrollbar-width:none] sm:flex-wrap sm:overflow-visible [&::-webkit-scrollbar]:hidden">
           {FILTERS.map((f) => (
-            <button key={f} onClick={() => setStatusFilter(f)}
-              className={cn("rounded-md px-3 py-1.5 text-xs font-medium transition-colors capitalize",
-                statusFilter === f ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>
+            <button
+              key={f}
+              onClick={() => setStatusFilter(f)}
+              className={cn(
+                "min-h-10 shrink-0 snap-start rounded-full px-4 text-xs font-medium capitalize transition-colors",
+                statusFilter === f
+                  ? "bg-foreground text-background"
+                  : "bg-muted text-muted-foreground hover:text-foreground",
+              )}
+            >
               {f}
             </button>
           ))}
@@ -161,7 +175,7 @@ export default function ClientLeadsPage() {
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search by name or phone..."
-            className="h-10 w-full rounded-md border border-border bg-background pl-9 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary" />
+            className="h-11 w-full rounded-md border border-border bg-background pl-9 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary" />
         </div>
       </div>
 

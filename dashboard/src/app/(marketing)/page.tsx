@@ -1,173 +1,351 @@
 import Link from "next/link";
-import {
-  ArrowRight,
-  BarChart3,
-  Bot,
-  MapPin,
-  MessageCircle,
-  Shield,
-  Sparkles,
-  TrendingUp,
-} from "lucide-react";
+import { ArrowRight, Sparkles, TrendingUp, Zap } from "lucide-react";
+import { FunnelCompareSection } from "@/components/marketing/home/funnel-compare-section";
+import { PeachHero } from "@/components/marketing/home/peach-hero";
+import { AgentAvatar } from "@/components/marketing/agent-avatar";
 import { CtaBand } from "@/components/marketing/cta-band";
 import { LogoStripSection } from "@/components/marketing/logo-strip-section";
-import { PRODUCTS, SITE } from "@/lib/marketing-content";
+import { Reveal } from "@/components/marketing/reveal";
+import { cn } from "@/lib/utils";
+import {
+  AGENT_CAST,
+  AGENT_ROSTER_TAGLINE,
+  HOME_BENEFITS,
+  HOME_FEATURE_ROWS,
+  HOME_FEATURES,
+  HOME_PLANS,
+  HOME_TESTIMONIALS,
+  SITE,
+  VERTICALS,
+} from "@/lib/marketing-content";
 
-const EXPLORE = [
-  {
-    title: "How it Works",
-    desc: "Connect GBP & WhatsApp → AI agents run → you get qualified leads.",
-    href: "/how-it-works",
-    icon: Sparkles,
-  },
-  {
-    title: "Case Studies",
-    desc: "Real studios. Real rankings. Real revenue from local search.",
-    href: "/case-studies",
-    icon: TrendingUp,
-  },
-  {
-    title: "Data & Insights",
-    desc: "What we collect, how we use it, and the models behind your dashboard.",
-    href: "/data",
-    icon: Shield,
-  },
-  {
-    title: "Contact",
-    desc: "Talk to our team — demos, partnerships, or questions.",
-    href: "/contact",
-    icon: MessageCircle,
-  },
-];
+const FEATURE_ICONS = {
+  spark: Sparkles,
+  sage: TrendingUp,
+  maya: Zap,
+} as const;
 
 export default function HomePage() {
   return (
     <>
-      <section className="mkt-hero-dark mkt-grid-bg relative overflow-hidden pt-28 pb-20 sm:pt-36 sm:pb-28">
-        <div className="mkt-blob mkt-blob-gold -left-24 top-10" />
-        <div className="mkt-blob mkt-blob-soft -right-16 top-32" />
+      <PeachHero />
 
-        <div className="mkt-container relative">
-          <div className="grid items-center gap-14 lg:grid-cols-2 lg:gap-16">
-            <div className="mkt-fade-up">
-              <p className="mkt-eyebrow">AI marketing for local business</p>
-              <h1 className="mkt-heading mt-5 text-4xl leading-[1.08] sm:text-5xl lg:text-6xl">
-                Turn local search into
-                <span className="mt-2 block landing-highlight-hero">qualified revenue.</span>
-              </h1>
-              <p className="mkt-body mt-6 max-w-lg text-lg">
-                GlamAI is your autonomous marketing team — GBP posts, WhatsApp qualification,
-                reviews, and business insights — built for service businesses in India.
+      {/* Product spotlight */}
+      <section className="mkt-section border-b border-white/5">
+        <div className="mkt-container-wide">
+          <div className="grid items-center gap-12 lg:grid-cols-2">
+            <Reveal>
+              <p className="mkt-peach-label">Product</p>
+              <h2 className="mkt-peach-headline mt-4 text-3xl sm:text-4xl lg:text-5xl">
+                Simplify complex local growth.
+              </h2>
+              <p className="mkt-body mt-6 text-lg">
+                One platform replaces scattered tools. Qimma coordinates visibility,
+                leads, reviews, and reporting — so your team focuses on delivery, not
+                marketing busywork.
               </p>
-              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                <Link href={SITE.demoUrl} className="mkt-btn-primary mkt-pulse-ring">
+              <div className="mt-8 flex flex-wrap gap-3">
+                <Link href={SITE.demoUrl} className="mkt-btn-primary">
                   Book a Demo
                 </Link>
-                <Link href="/product" className="mkt-btn-outline-light">
-                  Explore product
+                <Link href="/how-it-works" className="mkt-btn-secondary">
+                  Watch how it works
                 </Link>
               </div>
-              <div className="mt-10 flex flex-wrap gap-6 text-sm text-zinc-500">
-                <span className="flex items-center gap-2">
-                  <MapPin className="h-4 w-4 text-[#c9a962]" /> GBP optimization
-                </span>
-                <span className="flex items-center gap-2">
-                  <MessageCircle className="h-4 w-4 text-[#c9a962]" /> WhatsApp AI
-                </span>
-                <span className="flex items-center gap-2">
-                  <BarChart3 className="h-4 w-4 text-[#c9a962]" /> Live insights
-                </span>
+            </Reveal>
+            <Reveal delay={120}>
+              <div className="mkt-peach-glass-card relative overflow-hidden">
+                <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-cyan-500/20 blur-3xl" />
+                <p className="text-sm font-semibold text-cyan-400">This week&apos;s pipeline</p>
+                <ul className="mt-6 space-y-4">
+                  {[
+                    "Scout assigned 4 local keywords",
+                    "Sage moved 2 terms into top 5",
+                    "Spark published SEO GBP post",
+                    "Ruby sent 3 review requests",
+                    "Cleo delivered growth scorecard",
+                  ].map((item) => (
+                    <li key={item} className="flex items-center gap-3 text-sm text-zinc-300">
+                      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-cyan-400" />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
               </div>
-            </div>
-
-            <div className="mkt-fade-up mkt-delay-2 mkt-float relative mx-auto w-full max-w-lg lg:max-w-none">
-              <div className="mkt-card-3d rounded-2xl border border-white/10 bg-[#0a0a0a]/90 p-1 backdrop-blur-xl">
-                <div className="flex items-center gap-2 border-b border-white/10 px-4 py-3">
-                  <div className="h-2.5 w-2.5 rounded-full bg-red-400/70" />
-                  <div className="h-2.5 w-2.5 rounded-full bg-amber-400/70" />
-                  <div className="h-2.5 w-2.5 rounded-full bg-emerald-400/70" />
-                  <span className="ml-2 text-xs text-zinc-600">GlamAI · Studio Dashboard</span>
-                </div>
-                <div className="space-y-3 p-4">
-                  <div className="grid grid-cols-3 gap-2">
-                    {[
-                      { l: "Health", v: "72" },
-                      { l: "Leads", v: "8" },
-                      { l: "GBP views", v: "2.0k" },
-                    ].map((s) => (
-                      <div key={s.l} className="mkt-card-dark rounded-xl p-3 text-center">
-                        <p className="text-[10px] uppercase tracking-wider text-zinc-600">{s.l}</p>
-                        <p className="mt-1 text-xl font-bold text-white">{s.v}</p>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mkt-card-dark rounded-xl p-4">
-                    <div className="flex items-center gap-2 text-xs text-[#d4af37]">
-                      <Bot className="h-4 w-4" /> AI Agents · Running
-                    </div>
-                    <p className="mt-2 text-sm text-zinc-300">
-                      4 posts scheduled · 2 reviews replied · Profile optimized
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-[#c9a962]/20 bg-gradient-to-br from-[#c9a962]/10 to-transparent p-4">
-                    <p className="text-xs text-[#c9a962]">Image post draft</p>
-                    <p className="mt-1 line-clamp-2 text-sm text-zinc-200">
-                      ✨ 3BHK transformation in Whitefield — book a free consultation…
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
+            </Reveal>
           </div>
         </div>
       </section>
 
       <LogoStripSection />
 
-      <section className="mkt-section">
-        <div className="mkt-container">
-          <div className="mx-auto max-w-2xl text-center">
-            <p className="mkt-eyebrow">Explore</p>
-            <h2 className="mkt-heading mt-3 text-3xl sm:text-4xl">
-              Everything you need to know — on its own page
+      <FunnelCompareSection />
+
+      {/* Features grid */}
+      <section id="features" className="mkt-section mkt-section-muted">
+        <div className="mkt-container-wide">
+          <Reveal className="mx-auto max-w-3xl text-center">
+            <p className="mkt-peach-label">Features</p>
+            <h2 className="mkt-peach-headline mt-4 text-3xl sm:text-4xl lg:text-5xl">
+              The future of local marketing is here.
             </h2>
+            <p className="mkt-body mx-auto mt-4 max-w-2xl">
+              {AGENT_ROSTER_TAGLINE} Each agent owns a part of your growth — together
+              they run the full pipeline.
+            </p>
+          </Reveal>
+          <div className="mt-14 grid gap-6 sm:grid-cols-3">
+            {HOME_FEATURES.map((f, i) => {
+              const Icon = FEATURE_ICONS[f.icon];
+              return (
+                <Reveal key={f.title} delay={i * 80}>
+                  <div className="mkt-peach-glass-card h-full">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-cyan-500/15 text-cyan-400">
+                      <Icon className="h-6 w-6" />
+                    </div>
+                    <h3 className="mt-5 text-xl font-semibold text-white">{f.title}</h3>
+                    <p className="mt-2 text-sm leading-relaxed text-zinc-400">{f.desc}</p>
+                  </div>
+                </Reveal>
+              );
+            })}
           </div>
-          <div className="mt-12 grid gap-6 sm:grid-cols-2">
-            {EXPLORE.map((item) => (
-              <Link key={item.href} href={item.href} className="mkt-card group flex gap-5 p-8">
-                <div className="mkt-icon-box">
-                  <item.icon className="h-7 w-7" />
+        </div>
+      </section>
+
+      {/* Alternating feature rows */}
+      {HOME_FEATURE_ROWS.map((row, i) => (
+        <section
+          key={row.step}
+          className={cn(
+            "mkt-section border-b border-white/5",
+            i % 2 === 1 && "mkt-section-muted",
+          )}
+        >
+          <div className="mkt-container-wide">
+            <div
+              className={cn(
+                "grid items-center gap-10 lg:grid-cols-2 lg:gap-16",
+                i % 2 === 1 && "lg:[&>*:first-child]:order-2",
+              )}
+            >
+              <Reveal>
+                <p className="mkt-peach-label">{row.label}</p>
+                <h2 className="mkt-peach-headline mt-4 text-3xl sm:text-4xl">
+                  {row.title}
+                </h2>
+                <p className="mkt-body mt-5 text-lg">{row.desc}</p>
+                <Link href={row.href} className="mkt-btn-ghost mt-6 inline-flex gap-2">
+                  {row.cta} <ArrowRight className="h-4 w-4" />
+                </Link>
+              </Reveal>
+              <Reveal delay={100}>
+                <div className="relative">
+                  <span className="mkt-peach-feature-num absolute -left-2 -top-6 select-none">
+                    {row.step}
+                  </span>
+                  <div className="mkt-peach-glass-card ml-8 mt-8 min-h-[200px]">
+                    <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">
+                      Step {row.step}
+                    </p>
+                    <p className="mt-4 text-lg font-medium text-white">{row.label}</p>
+                    <div className="mt-6 h-px w-full bg-gradient-to-r from-cyan-500/50 via-violet-500/30 to-transparent" />
+                    <p className="mt-4 text-sm text-zinc-500">
+                      Automated · Coordinated · Measurable
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="flex items-center gap-2 text-lg font-bold text-white group-hover:text-[#d4af37]">
-                    {item.title}
-                    <ArrowRight className="h-4 w-4 opacity-0 transition-all group-hover:translate-x-0.5 group-hover:opacity-100" />
-                  </h3>
-                  <p className="mkt-body mt-2 text-sm">{item.desc}</p>
-                </div>
-              </Link>
+              </Reveal>
+            </div>
+          </div>
+        </section>
+      ))}
+
+      {/* Agent cast */}
+      <section id="agents" className="mkt-section">
+        <div className="mkt-container-wide">
+          <Reveal className="mx-auto max-w-3xl text-center">
+            <p className="mkt-peach-label">Your AI team</p>
+            <h2 className="mkt-peach-headline mt-4 text-3xl sm:text-4xl lg:text-5xl">
+              Meet Scout, Sage, Spark & the crew.
+            </h2>
+            <p className="mkt-body mx-auto mt-4 max-w-2xl">
+              Six specialists with real roles — territory, SEO, posts, leads, reviews,
+              and insights. Friendly names, serious outcomes.
+            </p>
+          </Reveal>
+          <div className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {AGENT_CAST.map((agent, i) => (
+              <Reveal key={agent.id} delay={i * 60}>
+                <Link
+                  href={agent.href}
+                  className={cn(
+                    "mkt-peach-glass-card group flex h-full flex-col",
+                    agent.glow,
+                  )}
+                >
+                  <div className="flex items-start gap-4">
+                    <AgentAvatar agent={agent.avatar} size={48} />
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold uppercase tracking-wider text-cyan-400/80">
+                        {agent.codename}
+                      </p>
+                      <h3 className="text-lg font-bold text-white group-hover:text-cyan-300">
+                        {agent.name}
+                      </h3>
+                      <p className="text-sm text-zinc-500">{agent.title}</p>
+                    </div>
+                  </div>
+                  <p className="mt-4 flex-1 text-sm leading-relaxed text-zinc-400">
+                    {agent.mission}
+                  </p>
+                  <p className="mt-4 text-xs text-cyan-400/70">{agent.liveStatus}</p>
+                </Link>
+              </Reveal>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="mkt-section mkt-section-muted">
-        <div className="mkt-container">
-          <div className="flex flex-col items-start justify-between gap-6 sm:flex-row sm:items-end">
-            <div>
-              <p className="mkt-eyebrow">Product</p>
-              <h2 className="mkt-heading mt-3 text-3xl">Four AI agents. One growth engine.</h2>
-            </div>
-            <Link href="/product" className="mkt-btn-ghost gap-2">
-              View all agents <ArrowRight className="h-4 w-4" />
-            </Link>
+      {/* Industries */}
+      <section className="mkt-section mkt-section-dark">
+        <div className="mkt-container-wide">
+          <Reveal className="mx-auto max-w-3xl text-center">
+            <p className="mkt-peach-label">Solutions</p>
+            <h2 className="mkt-peach-headline mt-4 text-3xl sm:text-4xl">
+              Built for local businesses that win on trust.
+            </h2>
+          </Reveal>
+          <div className="mt-12 grid gap-4 sm:grid-cols-2">
+            {VERTICALS.map((v, i) => (
+              <Reveal key={v.title} delay={i * 70}>
+                <Link
+                  href={v.href}
+                  className={cn(
+                    "mkt-peach-glass-card block bg-gradient-to-br",
+                    v.gradient,
+                  )}
+                >
+                  <h3 className="text-lg font-semibold text-white">{v.title}</h3>
+                  <ul className="mt-3 space-y-1.5">
+                    {v.bullets.map((b) => (
+                      <li key={b} className="text-sm text-zinc-400">
+                        · {b}
+                      </li>
+                    ))}
+                  </ul>
+                </Link>
+              </Reveal>
+            ))}
           </div>
-          <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {PRODUCTS.map((p) => (
-              <Link key={p.title} href={p.href} className="mkt-card block h-full p-6">
-                <h3 className="font-semibold text-white">{p.title}</h3>
-                <p className="mkt-body mt-2 text-sm">{p.desc}</p>
+        </div>
+      </section>
+
+      {/* Benefits */}
+      <section className="mkt-section border-y border-white/5">
+        <div className="mkt-container-wide">
+          <Reveal className="mx-auto max-w-3xl text-center">
+            <p className="mkt-peach-label">Benefits</p>
+            <h2 className="mkt-peach-headline mt-4 text-3xl sm:text-4xl">
+              Fast. Scalable. Built for local growth.
+            </h2>
+          </Reveal>
+          <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {HOME_BENEFITS.map((b, i) => (
+              <Reveal key={b.label} delay={i * 80}>
+                <div className="mkt-peach-stat-card">
+                  <p className="mkt-peach-stat-value mkt-gradient-text">{b.value}</p>
+                  <p className="mt-2 font-semibold text-white">{b.label}</p>
+                  <p className="mt-1 text-xs text-zinc-500">{b.sub}</p>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Testimonials */}
+      <section className="mkt-section mkt-section-muted">
+        <div className="mkt-container-wide">
+          <Reveal className="text-center">
+            <p className="mkt-peach-label">Testimonials</p>
+            <h2 className="mkt-peach-headline mt-4 text-3xl sm:text-4xl">
+              What business owners say.
+            </h2>
+          </Reveal>
+          <div className="mt-12 grid gap-6 lg:grid-cols-3">
+            {HOME_TESTIMONIALS.map((t, i) => (
+              <Reveal key={t.name} delay={i * 100}>
+                <blockquote className="mkt-peach-testimonial h-full">
+                  <p className="text-sm leading-relaxed text-zinc-300">
+                    &ldquo;{t.quote}&rdquo;
+                  </p>
+                  <footer className="mt-6 border-t border-white/10 pt-4">
+                    <p className="font-semibold text-white">{t.name}</p>
+                    <p className="text-xs text-zinc-500">{t.role}</p>
+                  </footer>
+                </blockquote>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Pricing preview */}
+      <section className="mkt-section">
+        <div className="mkt-container-wide">
+          <Reveal className="mx-auto max-w-3xl text-center">
+            <p className="mkt-peach-label">Pricing</p>
+            <h2 className="mkt-peach-headline mt-4 text-3xl sm:text-4xl">
+              Plans for every stage of growth.
+            </h2>
+            <p className="mkt-body mx-auto mt-4">
+              Every plan includes your full AI marketing team.{" "}
+              <Link href="/pricing" className="text-cyan-400 hover:underline">
+                See full pricing →
               </Link>
+            </p>
+          </Reveal>
+          <div className="mx-auto mt-12 grid max-w-5xl gap-6 lg:grid-cols-3">
+            {HOME_PLANS.map((plan, i) => (
+              <Reveal key={plan.name} delay={i * 90}>
+                <div
+                  className={cn(
+                    "mkt-pricing-card relative h-full",
+                    plan.highlight && "mkt-pricing-card-highlight",
+                  )}
+                >
+                  {"badge" in plan && plan.badge && (
+                    <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-cyan-400 px-3 py-1 text-xs font-bold text-[#030712]">
+                      {plan.badge}
+                    </span>
+                  )}
+                  <p className="text-sm font-semibold text-cyan-400">{plan.name}</p>
+                  <p className="mt-4 flex items-baseline gap-1">
+                    <span className="text-4xl font-bold text-white">{plan.price}</span>
+                    <span className="text-zinc-500">{plan.period}</span>
+                  </p>
+                  <p className="mt-2 text-sm text-zinc-500">{plan.desc}</p>
+                  <ul className="mt-6 space-y-2">
+                    {plan.features.map((f) => (
+                      <li key={f} className="text-sm text-zinc-400">
+                        · {f}
+                      </li>
+                    ))}
+                  </ul>
+                  <Link
+                    href={SITE.demoUrl}
+                    className={cn(
+                      "mt-8 block w-full rounded-full py-3 text-center text-sm font-semibold transition-all",
+                      plan.highlight
+                        ? "mkt-btn-primary"
+                        : "border border-white/20 text-white hover:bg-white/5",
+                    )}
+                  >
+                    Book a Demo
+                  </Link>
+                </div>
+              </Reveal>
             ))}
           </div>
         </div>

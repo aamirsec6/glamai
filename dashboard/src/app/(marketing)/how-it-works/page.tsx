@@ -17,7 +17,7 @@ export default function HowItWorksPage() {
       <section className="mkt-section">
         <div className="mkt-container">
           <div className="relative">
-            <div className="absolute left-8 top-0 hidden h-full w-px bg-gradient-to-b from-[#c9a962]/40 via-[#c9a962]/20 to-transparent lg:left-1/2 lg:block" />
+            <div className="absolute left-8 top-0 hidden h-full w-px bg-white/10 lg:left-1/2 lg:block" />
             <div className="space-y-16">
               {HOW_IT_WORKS_STEPS.map((step, i) => (
                 <div
@@ -25,7 +25,7 @@ export default function HowItWorksPage() {
                   className={`relative grid gap-8 lg:grid-cols-2 lg:gap-16 ${i % 2 === 1 ? "lg:text-right" : ""}`}
                 >
                   <div className={i % 2 === 1 ? "lg:order-2 lg:text-left" : ""}>
-                    <span className="text-5xl font-bold text-[#c9a962]/20">{step.step}</span>
+                    <span className="text-5xl font-bold text-white/10">{step.step}</span>
                     <h3 className="mkt-heading mt-2 text-2xl">{step.title}</h3>
                     <p className="mkt-body mt-3">{step.desc}</p>
                   </div>
@@ -33,7 +33,7 @@ export default function HowItWorksPage() {
                     className={`flex items-center ${i % 2 === 1 ? "lg:order-1 lg:justify-end" : "lg:justify-start"}`}
                   >
                     <div className="mkt-card flex h-32 w-full max-w-sm items-center justify-center lg:h-40">
-                      <CheckCircle2 className="h-12 w-12 text-[#d4af37]" />
+                      <CheckCircle2 className="h-12 w-12 text-cyan-400" />
                     </div>
                   </div>
                 </div>
@@ -52,7 +52,7 @@ export default function HowItWorksPage() {
                 <div key={item} className="mkt-card p-5 text-center text-sm font-medium text-zinc-300">
                   {item}
                 </div>
-              )
+              ),
             )}
           </div>
           <p className="mx-auto mt-8 max-w-xl text-center text-sm text-zinc-500">

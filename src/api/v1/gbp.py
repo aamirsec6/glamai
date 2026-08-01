@@ -18,6 +18,7 @@ from src.models.org import Org
 from src.application.gbp import GbpFacade
 from src.services.gbp.client import GbpClient
 from src.services.gbp.token_manager import GbpTokenManager
+from src.services.reviews.links import build_gbp_review_url
 from src.services.tenant.audit import log_tenant_event
 
 router = APIRouter(prefix="/v1/gbp", tags=["Google Business Profile"])
@@ -343,14 +344,36 @@ async def gbp_oauth_start(
     db: AsyncSession = Depends(get_db),
 ):
     """Redirect to Google OAuth for GBP connection."""
+    settings = get_settings()
+    frontend = (
+        settings.app_cors_origins[0]
+        if settings.app_cors_origins
+        else "http://localhost:3000"
+    ).rstrip("/")
+
     org = await db.get(Org, org_id)
     if not org:
-        raise HTTPException(status_code=404, detail="Organization not found")
+        return RedirectResponse(
+            url=f"{frontend}/client/onboarding?error=org_not_found",
+            status_code=302,
+        )
 
-    settings = get_settings()
+    client_id = (settings.google_client_id or "").strip()
+    client_secret = (settings.google_client_secret or "").strip()
+    if (
+        not client_id
+        or not client_secret
+        or client_id.startswith("your-")
+        or client_secret.startswith("your-")
+    ):
+        return RedirectResponse(
+            url=f"{frontend}/client/onboarding?error=gbp_oauth_not_configured",
+            status_code=302,
+        )
+
     client = GbpClient(
-        client_id=settings.google_client_id,
-        client_secret=settings.google_client_secret,
+        client_id=client_id,
+        client_secret=client_secret,
         redirect_uri=settings.google_redirect_uri,
     )
     url = client.get_oauth_url(state=org_id)
@@ -406,11 +429,135 @@ async def gbp_connection(
             "place_id": org.gbp_place_id,
             "gbp_name": org.gbp_name,
             "gbp_status": org.gbp_status,
+            "link_source": (
+                "places"
+                if integration
+                and integration.metadata_json
+                and '"source": "places"' in integration.metadata_json
+                else ("oauth" if integration else None)
+            ),
             "last_synced_at": (
                 org.gbp_last_synced_at.isoformat() if org.gbp_last_synced_at else None
             ),
+            "review_link": build_gbp_review_url(org.gbp_place_id),
         }
     }
+
+
+class SelectLocationBody(BaseModel):
+    org_id: str
+    location_name: str
+
+
+class PlacesSearchBody(BaseModel):
+    org_id: str
+    query: str | None = None
+
+
+class PlacesLinkBody(BaseModel):
+    org_id: str
+    place_id: str
+
+
+@router.post("/places/search")
+async def gbp_places_search(
+    body: PlacesSearchBody,
+    x_org_id: str | None = Header(default=None, alias="X-Org-Id"),
+    x_admin_secret: str | None = Header(default=None, alias="X-Admin-Secret"),
+    db: AsyncSession = Depends(get_db),
+):
+    """Search Google Places for a business (public data — gateway without OAuth)."""
+    assert_tenant_access(body.org_id, x_org_id, x_admin_secret)
+    facade = GbpFacade(db)
+    try:
+        result = await facade.search_places(body.org_id, body.query or "")
+        if result.get("status") == "org_not_found":
+            raise HTTPException(status_code=404, detail="Organization not found")
+        if result.get("status") == "places_api_not_configured":
+            raise HTTPException(
+                status_code=503,
+                detail="GOOGLE_PLACES_API_KEY missing — add it to .env and restart the API",
+            )
+        if result.get("status") == "error":
+            raise HTTPException(status_code=502, detail=result.get("error") or "Places search failed")
+        return {"data": result}
+    finally:
+        await facade.close()
+
+
+@router.post("/places/link")
+async def gbp_places_link(
+    body: PlacesLinkBody,
+    x_org_id: str | None = Header(default=None, alias="X-Org-Id"),
+    x_admin_secret: str | None = Header(default=None, alias="X-Admin-Secret"),
+    db: AsyncSession = Depends(get_db),
+):
+    """Link a Places business and extract profile, reviews, competitors."""
+    assert_tenant_access(body.org_id, x_org_id, x_admin_secret)
+    facade = GbpFacade(db)
+    try:
+        result = await facade.link_from_places(body.org_id, body.place_id)
+        if result.get("status") == "org_not_found":
+            raise HTTPException(status_code=404, detail="Organization not found")
+        if result.get("status") == "places_api_not_configured":
+            raise HTTPException(
+                status_code=503,
+                detail="GOOGLE_PLACES_API_KEY missing — add it to .env and restart the API",
+            )
+        if result.get("status") != "ok":
+            raise HTTPException(
+                status_code=502,
+                detail=result.get("error") or result.get("status") or "Link failed",
+            )
+        await db.commit()
+        return {"data": result, "message": "Business linked from Google Places"}
+    finally:
+        await facade.close()
+
+
+@router.get("/locations")
+async def gbp_locations(
+    org_id: str = Query(...),
+    x_org_id: str | None = Header(default=None, alias="X-Org-Id"),
+    x_admin_secret: str | None = Header(default=None, alias="X-Admin-Secret"),
+    db: AsyncSession = Depends(get_db),
+):
+    """List GBP locations available after OAuth."""
+    assert_tenant_access(org_id, x_org_id, x_admin_secret)
+    facade = GbpFacade(db)
+    try:
+        result = await facade.list_locations(org_id)
+        if result.get("status") == "org_not_found":
+            raise HTTPException(status_code=404, detail="Organization not found")
+        if result.get("status") != "ok":
+            raise HTTPException(status_code=502, detail=result.get("status"))
+        return {"data": result}
+    finally:
+        await facade.close()
+
+
+@router.post("/locations/select")
+async def gbp_select_location(
+    body: SelectLocationBody,
+    x_org_id: str | None = Header(default=None, alias="X-Org-Id"),
+    x_admin_secret: str | None = Header(default=None, alias="X-Admin-Secret"),
+    db: AsyncSession = Depends(get_db),
+):
+    """Select which GBP location this org should use."""
+    assert_tenant_access(body.org_id, x_org_id, x_admin_secret)
+    facade = GbpFacade(db)
+    try:
+        result = await facade.select_location(body.org_id, body.location_name)
+        if result.get("status") == "org_not_found":
+            raise HTTPException(status_code=404, detail="Organization not found")
+        if result.get("status") == "location_not_found":
+            raise HTTPException(status_code=404, detail="Location not found")
+        if result.get("status") != "ok":
+            raise HTTPException(status_code=502, detail=result.get("status"))
+        await db.commit()
+        return {"data": result, "message": "Location selected"}
+    finally:
+        await facade.close()
 
 
 @router.get("/insights")

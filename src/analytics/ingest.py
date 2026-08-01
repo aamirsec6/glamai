@@ -18,6 +18,37 @@ logger = structlog.get_logger(__name__)
 
 RATING_MAP = {"ONE": 1, "TWO": 2, "THREE": 3, "FOUR": 4, "FIVE": 5}
 
+# Google Business Profile CTA action types (stored in varchar(50))
+_GBP_CTA_TYPES = frozenset(
+    {"BOOK", "CALL", "LEARN_MORE", "ORDER", "SHOP", "SIGN_UP", "CONTACT"}
+)
+
+
+def _normalize_call_to_action(raw: Any) -> str | None:
+    """Map freeform AI CTAs to short GBP action types that fit varchar(50)."""
+    if raw is None:
+        return None
+    text = str(raw).strip()
+    if not text:
+        return None
+    upper = text.upper().replace("-", "_").replace(" ", "_")
+    if upper in _GBP_CTA_TYPES:
+        return upper
+    lower = text.lower()
+    if "book" in lower or "consult" in lower or "appoint" in lower:
+        return "BOOK"
+    if "call" in lower or "phone" in lower:
+        return "CALL"
+    if "order" in lower:
+        return "ORDER"
+    if "shop" in lower or "buy" in lower:
+        return "SHOP"
+    if "sign" in lower or "subscribe" in lower:
+        return "SIGN_UP"
+    if "contact" in lower:
+        return "CONTACT"
+    return "LEARN_MORE"
+
 
 class IngestEngine:
     """Maps normalized connector payloads to DB rows."""
@@ -84,14 +115,23 @@ class IngestEngine:
                 post_type = GbpPostType(post_type_key)
             except ValueError:
                 post_type = GbpPostType.STANDARD
+            title = p.get("title")
+            if isinstance(title, str) and len(title) > 255:
+                title = title[:255]
+            image_url = p.get("image_url")
+            if isinstance(image_url, str) and len(image_url) > 1000:
+                image_url = image_url[:1000]
+            keyword = p.get("keyword_target") or p.get("target_keyword")
+            if isinstance(keyword, str) and len(keyword) > 255:
+                keyword = keyword[:255]
             post = GbpPost(
                 org_id=org_id,
-                title=p.get("title"),
+                title=title,
                 content=p.get("content", ""),
                 post_type=post_type,
-                image_url=p.get("image_url"),
-                call_to_action=p.get("call_to_action"),
-                keyword_target=p.get("keyword_target"),
+                image_url=image_url,
+                call_to_action=_normalize_call_to_action(p.get("call_to_action")),
+                keyword_target=keyword,
                 status=GbpPostStatus.DRAFT,
                 ai_generated=True,
             )

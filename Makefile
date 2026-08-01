@@ -23,6 +23,14 @@ setup: ## Initial project setup
 dev: ## Start development server
 	$(UVICORN) src.main:app --reload --port 8000
 
+dashboard-dev: ## Start Next.js marketing dashboard (port 3000)
+	cd dashboard && npm run dev
+
+dashboard-dev-clean: ## Clean restart Next.js dashboard (fixes broken CSS / port conflicts)
+	-pkill -f "next dev" 2>/dev/null || true
+	-lsof -ti:3000 | xargs kill -9 2>/dev/null || true
+	cd dashboard && rm -rf .next && npm run dev
+
 dev-infra: ## Start infrastructure (postgres + redis)
 	docker compose up -d postgres redis
 
@@ -68,6 +76,12 @@ demo-seed: ## Seed demo account with sample data
 
 demo-seed-reset: ## Reset and re-seed demo account
 	$(PY) scripts/seed_demo.py --reset
+
+demo-clear: ## Delete seeded demo (+ journey bulk) — use before real client GBP
+	$(PY) scripts/clear_seeded_data.py --journey-bulk
+
+hygiene-bakery: ## Wipe seed data, run bakery pilot workflow + admin audit checks
+	$(PY) scripts/hygiene_bakery_pilot.py
 
 journey-seed: ## Seed ~120 orgs for journey analytics testing
 	$(PY) scripts/seed_journey_bulk.py --count 120
